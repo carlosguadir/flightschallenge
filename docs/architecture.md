@@ -66,7 +66,7 @@ importa `infrastructure` ni las tripas de otro módulo; cada módulo expone solo
 | `testing`       | hook de reset para e2e                       | se registra solo con `NODE_ENV=test\|e2e`        |
 
 `reservations` es el núcleo de consistencia: separar asientos de bookings obligaría a una saga.
-Los demás módulos son extraíbles; el orden y los disparadores están en el apéndice.
+Los demás módulos son extraíbles; el orden y los disparadores se deciden cuando exista una necesidad real de escala, equipo o compliance.
 
 ## 2. Por qué este estilo
 
@@ -75,7 +75,7 @@ Los demás módulos son extraíbles; el orden y los disparadores están en el ap
 El requisito difícil —no vender dos veces el mismo asiento— es un único límite transaccional.
 Mantenerlo en un proceso y una transacción ACID es la solución correcta más simple. La
 modularidad se paga con puertos, fronteras lintadas y tests, no con una red entre servicios.
-La ruta de extracción existe (roles desplegables, módulos con dueños claros) en caso de que la organización requiera migrar a otro tipo de architectura.
+La ruta de extracción existe (roles desplegables, módulos con dueños claros) en caso de que la organización requiera migrar a otro tipo de arquitectura.
 
 ### 2.2 PostgreSQL como autoridad
 
@@ -429,7 +429,10 @@ esas piezas agregarían complejidad sin resolver el requisito.
 ## 11. Límites y camino a producción
 
 El entregable no incluye AWS, Terraform, Helm, CD, tracing, outbox, máquina de estados de pagos
-reales ni jobs asíncronos. Están identificados y justificados en la tabla de modos de fallo.
+reales ni jobs asíncronos. Están identificados y justificados en la tabla de modos de fallo. La
+lista accionable con prioridades y criterios está en
+[README.md](../README.md#pendientes-para-producción) y
+[DEMO.md §6](../DEMO.md#6-todo-y-camino-a-producción).
 
 ### Tabla de modos de fallo
 

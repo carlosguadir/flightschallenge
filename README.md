@@ -135,12 +135,27 @@ npm run test:unit
 - Vitest: unitarios en paralelo; integración serial contra `app_test`; Playwright `workers: 1`, contextos nuevos y reset por test.
 - CI (`.github/workflows/ci.yml`): `preflight`, `quality`, `integration`, `e2e` y `secrets` con Podman rootless y `podman-compose==1.5.0`; sin Docker.
 
+## Pendientes para producción
+
+La lista accionable, con criterios de cierre y referencias al código, está en
+[DEMO.md §6](DEMO.md#6-todo-y-camino-a-producción). Resumen por prioridad:
+
+- **P0 — Seguridad:** autenticación y roles del back-office; conexiones y permisos de DB
+  separados.
+- **P1 — Dinero y efectos externos:** pasarela de pago real con máquina de estados y webhooks;
+  outbox + worker para email/notificaciones; un pasajero por asiento.
+- **P2 — Operación:** health y métricas restringidos a operadores; tracing/Prometheus/SLOs;
+  adapter Redis y soporte multi-instancia.
+- **P3 — Evolución:** sharding de filas antiguas, `/api/v1` con expand/contract, auditoría/PII/PCI,
+  i18n, zonas horarias y pruebas de carga.
+
 ## Variables de entorno
 
 Ver [.env.example](.env.example). Las principales: `DATABASE_URL`, `COOKIE_SECRET`, `COOKIE_SECURE`, `TRUST_PROXY`, `SEAT_HOLD_TTL_SECONDS`, `MAX_HOLDS_PER_FLIGHT`, `THROTTLE_ENABLED`, `PG_POOL_MAX`, `LOCK_TIMEOUT_MS`, `STATEMENT_TIMEOUT_MS`, `TEST_RESET_TOKEN` (solo `test|e2e`), `SWAGGER_ENABLED`.
 
 ## Documentación
 
+- [DEMO.md](DEMO.md) — diagramas de idempotencia/atomicidad, guion de demo y TODOs de producción.
 - [docs/architecture.md](docs/architecture.md) — decisiones, SQL de concurrencia, realtime, testing y modos de fallo.
 - [docs/operations.md](docs/operations.md) — arranque, reset, perfiles, variables y troubleshooting.
 - [docs/ia.md](docs/ia.md) — bitácora de uso de IA y consolidado de impacto por fase.
