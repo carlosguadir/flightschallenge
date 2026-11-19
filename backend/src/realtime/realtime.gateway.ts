@@ -25,6 +25,8 @@ export class RealtimeGateway implements OnGatewayInit {
   @WebSocketServer()
   private server!: Server;
 
+  private ready = false;
+
   constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
 
   afterInit(server: Server): void {
@@ -43,6 +45,12 @@ export class RealtimeGateway implements OnGatewayInit {
       data.sessionId = sessionId;
       next();
     });
+
+    this.ready = true;
+  }
+
+  isReady(): boolean {
+    return this.ready && this.server !== undefined;
   }
 
   @SubscribeMessage('flight.join')

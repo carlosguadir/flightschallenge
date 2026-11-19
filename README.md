@@ -19,7 +19,7 @@ El seat map mantiene un buffer de eventos hasta recibir el ack de `flight.join` 
 
 | Método | Ruta                                      | Descripción                                                 |
 | ------ | ----------------------------------------- | ----------------------------------------------------------- |
-| GET    | `/api/health`                             | Healthcheck con ping a la base                              |
+| GET    | `/api/health`                             | Healthcheck de base y gateway realtime                      |
 | GET    | `/api/flights?origin=&destination=&date=` | Búsqueda (fecha UTC `YYYY-MM-DD`)                           |
 | GET    | `/api/flights/:id`                        | Detalle del vuelo                                           |
 | GET    | `/api/flights/:id/seats`                  | Snapshot del seat map + `serverTime` + versión              |
@@ -120,7 +120,7 @@ npm run test:unit
 ```
 
 - 23 tests unitarios (10 backend + 13 frontend): reducer versionado, reconnect buffer, countdown, idempotencia —incluido el fallback de UUID fuera de contexto seguro—, guards, UoW y redacción de logs.
-- 41 tests de integración en el perfil `test` de Podman, contra Postgres real (`app_test`).
+- 42 tests de integración en el perfil `test` de Podman, contra Postgres real (`app_test`).
 - 5 tests E2E Playwright con dos contextos, expiración real y axe sin violaciones WCAG 2.1 AA.
 
 - ESLint 9 flat config: `typescript-eslint` type-aware, React Hooks/Refresh y `eslint-plugin-boundaries` (prohíbe que `application` importe `infrastructure`, que `shared`/`frontend` importen backend y que `e2e` importe internals).

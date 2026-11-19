@@ -68,7 +68,7 @@ y se usa solo desde Playwright.
 # Unitarios (sin DB): 23 tests
 podman compose -f compose.yaml --profile test run --rm tests npm run test:unit
 
-# Integración (Postgres real, base app_test, serial): 41 tests
+# Integración (Postgres real, base app_test, serial): 42 tests
 podman compose -f compose.yaml --profile test build tests
 podman compose -f compose.yaml --profile test run --rm tests
 
@@ -125,7 +125,9 @@ podman compose --env-file .env.e2e -f compose.yaml -p flight-e2e --profile e2e d
 - `X-Request-Id` se acepta o genera y se devuelve en la respuesta.
 - Eventos de auditoría: `seat.hold.*`, `booking.*`, `payment.declined`, `flight.status.changed`,
   `sweeper.tick`.
-- Health: `GET /api/health` (ping a la DB y 503 si no responde).
+- Health: `GET /api/health` (ping a la DB y gateway Socket.io inicializado; 503 si falta
+  cualquiera). No abre una conexión de socket sintética: la aceptación real se cubre en los tests
+  de integración y E2E.
 - El dashboard muestra la versión del vuelo, contadores, ocupación y feed de actividad.
 
 ## CI

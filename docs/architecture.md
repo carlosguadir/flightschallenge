@@ -380,7 +380,7 @@ hold intacto y no crea fila en `bookings`.
 - **Unitarios (23):** reducer versionado, reconnect buffer, countdown, idempotencia —incluido el
   fallback de UUID fuera de contexto seguro—, hash, guards, Unit of Work, redacción de logs y
   fronteras de arquitectura.
-- **Integración (41):** Vitest serial contra PostgreSQL real en la base `app_test`, con migraciones,
+- **Integración (42):** Vitest serial contra PostgreSQL real en la base `app_test`, con migraciones,
   seed determinista y reset entre archivos. Cubren concurrencia de 50 sesiones, idempotencia,
   límite de holds, sweeper, carreras de booking/cancelación, rate limit dedicado, cookie/trust
   proxy, sockets reales y el hook de reset de e2e.

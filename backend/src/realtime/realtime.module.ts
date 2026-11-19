@@ -8,5 +8,6 @@ import { RealtimeGateway } from './realtime.gateway';
 @Module({
   imports: [SharedKernelModule, InsightsModule],
   providers: [RealtimeGateway, RealtimeEventPublisher],
+  exports: [RealtimeGateway],
 })
 export class RealtimeModule {}

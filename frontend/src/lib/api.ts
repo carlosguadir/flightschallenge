@@ -78,7 +78,7 @@ function queryString(query: FlightSearchQuery): string {
   return value ? `?${value}` : '';
 }
 
-export function getHealth(): Promise<{ status: string; db: string }> {
+export function getHealth(): Promise<{ status: string; db: string; realtime: string }> {
   return request('/api/health');
 }
 
