@@ -36,6 +36,7 @@ services:
       THROTTLE_ENABLED: 'true'
       THROTTLE_LIMIT: '100'
       THROTTLE_TTL_SECONDS: '60'
+      METRICS_BATCH_MS: '75'
       LOG_LEVEL: info
       LOG_PRETTY: 'false'
       APP_VERSION: dev
@@ -88,6 +89,7 @@ services:
       THROTTLE_ENABLED: 'false'
       THROTTLE_LIMIT: '100'
       THROTTLE_TTL_SECONDS: '60'
+      METRICS_BATCH_MS: '25'
       LOG_LEVEL: silent
       LOG_PRETTY: 'false'
     depends_on:

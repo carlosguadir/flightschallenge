@@ -63,3 +63,20 @@ Pendiente de consolidar. La implementación de la fase 1 fue directa gracias a q
 ### Impacto estimado
 
 Pendiente de consolidar. La fase 2 se apoyó en el esquema y el Unit of Work existentes; el tiempo se concentró en la semántica de idempotencia (fast path + chequeo intra-transacción), el manejo de colisiones de código y los tests concurrentes.
+
+## Fase 3 — Realtime, métricas y administración
+
+### Prompts y casos de uso
+
+- **Prompt:** «procede con la fase 3».
+- **Resultado:** gateway Socket.io con rooms `flight:{id}` y `search`, ack de `flight.join`, `flight.leave`, `search.join`, broadcast de `seat.*`/`flight.updated`, evento `flight.metrics` batched, endpoint de métricas, transiciones administrativas con guard y la suite §10.8, §10.12, §10.16 y §10.19.
+
+### Casos en los que la IA se equivocó y cómo se corrigió
+
+- **Módulo sin sus dependencias.** `CatalogModule` registró `ChangeFlightStatus`, que inyecta `UNIT_OF_WORK` y `EVENT_PUBLISHER`, pero no importaba `SharedKernelModule`; Nest falló al resolver la dependencia. Se añadió el import y la suite de integración lo detectó de inmediato.
+- **Batching sin deduplicación.** Programar un `setTimeout` por cada evento de asiento habría enviado varias métricas en la misma ventana. Se deduplicó por `flightId` con un mapa de timers: la primera señal abre la ventana y los eventos siguientes se agrupan en un solo `flight.metrics`.
+- **Test de dos clientes incompleto.** La primera versión de §10.8 solo verificaba el receptor B. Se añadió el receptor A y la igualdad de versión entre ambos sockets para probar que el broadcast es el mismo evento y que la versión es monótona.
+
+### Impacto estimado
+
+Pendiente de consolidar. La fase 3 fue corta porque los eventos ya se publicaban after-commit y el contrato de versiones existía; el mayor esfuerzo fue el orden de inicialización del gateway/publisher y la ventana de batching.

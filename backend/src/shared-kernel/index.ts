@@ -3,4 +3,5 @@ export * from './application/ports/event-publisher.port';
 export * from './application/ports/id-generator.port';
 export * from './application/ports/unit-of-work.port';
 export * from './domain/app-error';
+export * from './infrastructure/in-process-event-bus';
 export * from './shared-kernel.module';

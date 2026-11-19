@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import type { FlightStatus } from '@flight/shared';
 
-import { AppError } from '../../shared-kernel/domain/app-error';
-import type { DbTransaction } from '../../shared-kernel/application/ports/unit-of-work.port';
-import type { FlightStatePort, SeatChangeResult } from '../application/ports/flight-state.port';
+import type { DbTransaction } from '../../shared-kernel';
+import { AppError } from '../../shared-kernel';
+import type {
+  FlightStatePort,
+  FlightStatusChangeResult,
+  SeatChangeResult,
+} from '../application/ports/flight-state.port';
+import { canTransitionFlightStatus } from '../domain/flight-status';
 
 interface FlightRow {
   status: FlightStatus;
@@ -26,6 +31,64 @@ export class PostgresFlightStateAdapter implements FlightStatePort {
     if (result.rows[0].status === 'CANCELLED') {
       throw new AppError('FLIGHT_NOT_BOOKABLE', 409, 'Flight is cancelled');
     }
+  }
+
+  async changeStatus(
+    tx: DbTransaction,
+    flightId: string,
+    status: FlightStatus,
+    delayMinutes?: number,
+  ): Promise<FlightStatusChangeResult> {
+    const flightResult = await tx.query<FlightRow>(
+      `SELECT status, sold_out, delay_minutes, version
+       FROM flights
+       WHERE id = $1
+       FOR UPDATE`,
+      [flightId],
+    );
+
+    if (flightResult.rowCount === 0) {
+      throw new AppError('FLIGHT_NOT_FOUND', 404, 'Flight not found');
+    }
+
+    const flight = flightResult.rows[0];
+    if (!canTransitionFlightStatus(flight.status, status)) {
+      throw new AppError(
+        'INVALID_STATUS_TRANSITION',
+        409,
+        `Cannot transition flight from ${flight.status} to ${status}`,
+      );
+    }
+
+    const nextDelay =
+      status === 'DELAYED'
+        ? (delayMinutes ?? 0)
+        : status === 'SCHEDULED'
+          ? 0
+          : flight.delay_minutes;
+    const version = Number(flight.version) + 1;
+
+    await tx.query(
+      `UPDATE flights
+       SET status = $2, delay_minutes = $3, version = $4
+       WHERE id = $1`,
+      [flightId, status, nextDelay, version],
+    );
+
+    const availabilityResult = await tx.query<{ available: number }>(
+      `SELECT count(*)::int AS available
+       FROM seats
+       WHERE flight_id = $1 AND status = 'AVAILABLE'`,
+      [flightId],
+    );
+
+    return {
+      status,
+      delayMinutes: nextDelay,
+      soldOut: flight.sold_out,
+      availableSeats: availabilityResult.rows[0]?.available ?? 0,
+      version,
+    };
   }
 
   async recordSeatChange(

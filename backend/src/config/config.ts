@@ -14,6 +14,7 @@ export interface AppConfig {
   throttleEnabled: boolean;
   throttleLimit: number;
   throttleTtlSeconds: number;
+  metricsBatchMs: number;
   logLevel: string;
   logPretty: boolean;
   appVersion: string;
@@ -68,6 +69,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throttleEnabled: readBoolean(env.THROTTLE_ENABLED, false),
     throttleLimit: readInt(env.THROTTLE_LIMIT, 100),
     throttleTtlSeconds: readInt(env.THROTTLE_TTL_SECONDS, 60),
+    metricsBatchMs: readInt(env.METRICS_BATCH_MS, 75),
     logLevel: env.LOG_LEVEL ?? (nodeEnv === 'test' || nodeEnv === 'e2e' ? 'silent' : 'info'),
     logPretty: readBoolean(env.LOG_PRETTY, nodeEnv === 'development'),
     appVersion: env.APP_VERSION ?? 'dev',
