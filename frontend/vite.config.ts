@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
       watch: { usePolling: env.VITE_USE_POLLING === 'true' },
       proxy: {
         '/api': { target: backendUrl, changeOrigin: true },
-        '/socket.io': { target: backendUrl, ws: true, changeOrigin: true },
+        '/realtime': { target: backendUrl, ws: true, changeOrigin: true },
       },
     },
   };

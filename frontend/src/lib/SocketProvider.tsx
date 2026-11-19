@@ -24,7 +24,7 @@ export function SocketProvider({ children }: PropsWithChildren): JSX.Element {
 
       if (cancelled) return;
 
-      client = io({ path: '/socket.io' });
+      client = io({ path: '/realtime' });
       client.on('connect', () => setConnected(true));
       client.on('disconnect', () => setConnected(false));
       setSocket(client);

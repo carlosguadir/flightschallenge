@@ -20,6 +20,7 @@ function setCookieHeader(response: request.Response): string {
 function connectSocket(port: number, cookie: string): Promise<Socket> {
   return new Promise((resolve, reject) => {
     const socket = io(`http://127.0.0.1:${port}`, {
+      path: '/realtime',
       transports: ['websocket'],
       reconnection: false,
       timeout: 2000,

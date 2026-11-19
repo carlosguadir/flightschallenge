@@ -20,7 +20,7 @@ export function flightRoom(flightId: string): string {
   return `flight:${flightId}`;
 }
 
-@WebSocketGateway({ path: '/socket.io' })
+@WebSocketGateway({ path: '/realtime' })
 export class RealtimeGateway implements OnGatewayInit {
   @WebSocketServer()
   private server!: Server;
