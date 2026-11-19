@@ -49,11 +49,11 @@ describe('booking contract, decline and validation', () => {
     const booking = response.body as BookingResponse;
     expect(booking).toMatchObject({
       flightId,
-      seatId,
-      seatLabel: '1A',
       currency: 'USD',
       passenger: { name: 'Ada Lovelace', email: 'ada@example.com' },
+      seats: [expect.objectContaining({ seatId, seatLabel: '1A' })],
     });
+    expect(booking.seats).toHaveLength(1);
     expect(booking.code).toMatch(/^[A-Z2-9]{6}$/);
     expect(typeof booking.createdAt).toBe('string');
 

@@ -4,12 +4,12 @@ import type { BookingRequest } from '@flight/shared';
 
 export function bookingBody(
   flightId: string,
-  seatId: string,
+  seatIdOrIds: string | string[],
   overrides: Partial<BookingRequest> = {},
 ): BookingRequest {
   const base: BookingRequest = {
     flightId,
-    seatId,
+    seatIds: Array.isArray(seatIdOrIds) ? seatIdOrIds : [seatIdOrIds],
     passenger: { name: 'Ada Lovelace', email: 'ada@example.com' },
     payment: { method: 'TEST_OK' },
   };
@@ -17,6 +17,7 @@ export function bookingBody(
   return {
     ...base,
     ...overrides,
+    seatIds: overrides.seatIds ?? base.seatIds,
     passenger: { ...base.passenger, ...overrides.passenger },
     payment: { ...base.payment, ...overrides.payment },
   };

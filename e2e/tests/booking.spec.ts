@@ -78,7 +78,7 @@ test('E2E-2: booking in one context locks the seat in the other and shows the ti
   await expect(seatB).toHaveAttribute('aria-pressed', 'false');
   await expect(
     pageB.getByText(
-      'Select an available seat to hold it for a few minutes. Holds are released automatically when the timer ends.',
+      'Select up to four available seats to hold them for a few minutes. Holds are released automatically when the timer ends.',
     ),
   ).toBeVisible();
 
@@ -158,6 +158,41 @@ test('E2E-4: an expired hold returns the seat and updates both contexts and the 
   await expect(metricValue(dashboardB, 'held')).toHaveText('0', { timeout: 20_000 });
   await expect(metricValue(dashboardB, 'available')).toHaveText('180');
   await expect(dashboardB.getByText('Seat 1A released (expired)')).toBeVisible();
+});
+
+test('E2E-6: confirming two held seats creates one reservation with one code', async ({
+  browser,
+  request,
+}) => {
+  const flight = await findFlight(request, 'AV1006');
+  const context = await browser.newContext({ baseURL: BASE_URL });
+  const page = await context.newPage();
+
+  const seatA = await openSeatMap(page, flight.id, '1A');
+  await seatA.click();
+  await expect(seatA).toHaveClass(/seat-mine/);
+
+  const seatB = page.getByTestId('seat-1B');
+  await expect(seatB).toHaveAttribute('aria-disabled', 'false');
+  await seatB.click();
+  await expect(seatB).toHaveClass(/seat-mine/);
+
+  await expect(page.locator('.checkout-seat-label')).toHaveText('2 seats');
+  const confirm = page.getByTestId('confirm-booking');
+  await expect(confirm).toHaveText('Confirm booking (2 seats)');
+
+  await page.getByLabel('Passenger name').fill('Ada Lovelace');
+  await page.getByLabel('Passenger email').fill('ada@example.com');
+  await confirm.click();
+
+  await expect(page).toHaveURL(/\/booking\/[A-HJ-NP-Z2-9]{6}$/);
+  const code = page.url().split('/').pop() ?? '';
+  expect(code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
+
+  await page.getByLabel('Passenger email').fill('ada@example.com');
+  await page.getByRole('button', { name: 'View ticket' }).click();
+  await expect(page.getByTestId('ticket')).toContainText(code);
+  await expect(page.getByTestId('ticket')).toContainText('1A, 1B');
 });
 
 test('E2E-5: the seat map passes axe WCAG 2.1 AA checks', async ({ browser, request }) => {

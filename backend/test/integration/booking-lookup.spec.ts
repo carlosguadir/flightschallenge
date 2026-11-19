@@ -52,7 +52,7 @@ describe('10.15 booking lookup', () => {
       flightNumber: PRIMARY_TEST_FLIGHT,
       origin: 'BOG',
       destination: 'MDE',
-      seatLabel: '1A',
+      seats: [expect.objectContaining({ seatLabel: '1A' })],
       passengerName: 'Ada Lovelace',
       currency: 'USD',
     });

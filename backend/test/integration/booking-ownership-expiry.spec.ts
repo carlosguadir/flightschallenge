@@ -83,7 +83,7 @@ describe('booking ownership, expiry and cancellation guards', () => {
     expect(rows.rows[0].count).toBe(0);
 
     const seatRows = await pool.query<{ count: number }>(
-      'SELECT count(*)::int AS count FROM bookings WHERE seat_id = $1',
+      'SELECT count(*)::int AS count FROM booking_seats WHERE seat_id = $1',
       [seatId],
     );
     expect(seatRows.rows[0].count).toBe(0);

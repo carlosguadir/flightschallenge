@@ -37,26 +37,55 @@ describe('booking idempotency key lifecycle', () => {
     const seatId = '22222222-2222-4222-8222-222222222222';
 
     const fingerprint = bookingFingerprint({
-      seatId,
+      seatIds: [seatId],
       passengerName: 'Ada Lovelace',
       passengerEmail: 'ada@example.com',
       paymentMethod: 'TEST_OK',
     });
 
-    expect(getOrCreateIdempotencyKey(flightId, seatId, fingerprint, storage, generate)).toBe(
+    expect(getOrCreateIdempotencyKey(flightId, [seatId], fingerprint, storage, generate)).toBe(
       'key-1',
     );
-    expect(getOrCreateIdempotencyKey(flightId, seatId, fingerprint, storage, generate)).toBe(
+    expect(getOrCreateIdempotencyKey(flightId, [seatId], fingerprint, storage, generate)).toBe(
       'key-1',
     );
 
     const declined = bookingFingerprint({
-      seatId,
+      seatIds: [seatId],
       passengerName: 'Ada Lovelace',
       passengerEmail: 'ada@example.com',
       paymentMethod: 'TEST_DECLINE',
     });
-    expect(getOrCreateIdempotencyKey(flightId, seatId, declined, storage, generate)).toBe('key-2');
+    expect(getOrCreateIdempotencyKey(flightId, [seatId], declined, storage, generate)).toBe(
+      'key-2',
+    );
+  });
+
+  it('treats seat order as the same reservation group', () => {
+    const storage = new MemoryStorage();
+    const flightId = '11111111-1111-4111-8111-111111111111';
+    const seatA = '22222222-2222-4222-8222-222222222222';
+    const seatB = '33333333-3333-4333-8333-333333333333';
+    const left = bookingFingerprint({
+      seatIds: [seatA, seatB],
+      passengerName: 'Ada Lovelace',
+      passengerEmail: 'ada@example.com',
+      paymentMethod: 'TEST_OK',
+    });
+    const right = bookingFingerprint({
+      seatIds: [seatB, seatA],
+      passengerName: 'Ada Lovelace',
+      passengerEmail: 'ada@example.com',
+      paymentMethod: 'TEST_OK',
+    });
+
+    expect(left).toBe(right);
+    expect(getOrCreateIdempotencyKey(flightId, [seatA, seatB], left, storage, () => 'key-1')).toBe(
+      'key-1',
+    );
+    expect(getOrCreateIdempotencyKey(flightId, [seatB, seatA], right, storage, () => 'key-2')).toBe(
+      'key-1',
+    );
   });
 
   it('clears the stored key after a successful booking', () => {
@@ -65,11 +94,23 @@ describe('booking idempotency key lifecycle', () => {
     const seatId = '22222222-2222-4222-8222-222222222222';
     const fingerprint = 'fingerprint';
 
-    const first = getOrCreateIdempotencyKey(flightId, seatId, fingerprint, storage, () => 'key-1');
+    const first = getOrCreateIdempotencyKey(
+      flightId,
+      [seatId],
+      fingerprint,
+      storage,
+      () => 'key-1',
+    );
     expect(first).toBe('key-1');
 
-    clearIdempotencyKey(flightId, seatId, storage);
-    const second = getOrCreateIdempotencyKey(flightId, seatId, fingerprint, storage, () => 'key-2');
+    clearIdempotencyKey(flightId, [seatId], storage);
+    const second = getOrCreateIdempotencyKey(
+      flightId,
+      [seatId],
+      fingerprint,
+      storage,
+      () => 'key-2',
+    );
     expect(second).toBe('key-2');
   });
 
@@ -87,13 +128,13 @@ describe('booking idempotency key lifecycle', () => {
 
   it('normalizes passenger data in the fingerprint', () => {
     const left = bookingFingerprint({
-      seatId: 'seat',
+      seatIds: ['seat'],
       passengerName: '  Ada  ',
       passengerEmail: 'ADA@EXAMPLE.COM',
       paymentMethod: 'TEST_OK',
     });
     const right = bookingFingerprint({
-      seatId: 'seat',
+      seatIds: ['seat'],
       passengerName: 'Ada',
       passengerEmail: 'ada@example.com',
       paymentMethod: 'TEST_OK',
