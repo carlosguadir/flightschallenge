@@ -8,6 +8,7 @@ import {
 import { ZodValidationPipe } from '../../validation/zod-validation.pipe';
 import { ChangeFlightStatus } from '../application/use-cases/change-flight-status.use-case';
 
+// TODO consider implement a operator site where endpoints like this run authentication with admin roles to allow access
 @Controller('admin/flights')
 export class AdminFlightsController {
   constructor(private readonly changeFlightStatus: ChangeFlightStatus) {}

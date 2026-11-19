@@ -6,6 +6,9 @@ import { GetMetrics } from './application/use-cases/get-metrics.use-case';
 import { MetricsController } from './infrastructure/metrics.controller';
 import { PostgresMetricsQueryAdapter } from './infrastructure/postgres-metrics-query.adapter';
 
+/**
+ * TODO another controller to possibbly only available for admins
+ */
 @Module({
   imports: [DatabaseModule],
   controllers: [MetricsController],

@@ -4,6 +4,9 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { DatabaseService } from '../database/database.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 
+/**
+ * TODO health only for operators with authentication
+ */
 @Controller('health')
 export class HealthController {
   constructor(
