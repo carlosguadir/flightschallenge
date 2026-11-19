@@ -26,12 +26,12 @@ El seat map mantiene un buffer de eventos hasta recibir el ack de `flight.join` 
 | GET    | `/api/flights/:id/metrics`                | Contadores y ocupación del dashboard                        |
 | POST   | `/api/flights/:id/seats/:seatId/hold`     | Hold idempotente (máx. 4 por sesión/vuelo)                  |
 | DELETE | `/api/flights/:id/seats/:seatId/hold`     | Release del hold propio                                     |
-| POST   | `/api/bookings`                           | Booking con `Idempotency-Key` y pago fake                   |
+| POST   | `/api/bookings`                           | Reserva de 1–4 asientos con un código y pago fake           |
 | POST   | `/api/bookings/lookup`                    | Ticket por `{code, email}` (rate limited, sin enumeración)  |
 | PATCH  | `/api/admin/flights/:id/status`           | Cambiar estado (`SCHEDULED`/`DELAYED`/`CANCELLED`)          |
 | POST   | `/api/test/reset`                         | Solo `NODE_ENV=test\|e2e` + `x-test-reset-token`; resiembra |
 
-`POST /api/bookings` acepta `payment.method` como `TEST_OK` o `TEST_DECLINE`; no recibe datos de tarjeta. La primera confirmación devuelve `201` y los replays idempotentes `200`.
+`POST /api/bookings` acepta `seatIds` (1–4 asientos) y `payment.method` como `TEST_OK` o `TEST_DECLINE`; no recibe datos de tarjeta. Una sola confirmación crea una reserva, un código y un total. La primera confirmación devuelve `201` y los replays idempotentes `200`.
 
 ### API docs
 
@@ -84,7 +84,7 @@ podman compose -f compose.yaml --profile test run --rm tests npm run test:unit
 podman compose -f compose.yaml --profile test build tests
 podman compose -f compose.yaml --profile test run --rm tests
 
-# E2E Playwright (5 tests, contexto aislado, axe incluido)
+# E2E Playwright (6 tests, contexto aislado, axe incluido)
 make test-e2e
 ```
 
@@ -126,9 +126,9 @@ npm run format:check
 npm run test:unit
 ```
 
-- 23 tests unitarios (10 backend + 13 frontend): reducer versionado, reconnect buffer, countdown, idempotencia —incluido el fallback de UUID fuera de contexto seguro—, guards, UoW y redacción de logs.
-- 45 tests de integración en el perfil `test` de Podman, contra Postgres real (`app_test`).
-- 5 tests E2E Playwright con dos contextos, expiración real y axe sin violaciones WCAG 2.1 AA.
+- 24 tests unitarios (10 backend + 14 frontend): reducer versionado, reconnect buffer, countdown, idempotencia —incluido el fallback de UUID fuera de contexto seguro—, guards, UoW y redacción de logs.
+- 49 tests de integración en el perfil `test` de Podman, contra Postgres real (`app_test`).
+- 6 tests E2E Playwright con dos contextos, reserva multi-asiento, expiración real y axe sin violaciones WCAG 2.1 AA.
 
 - ESLint 9 flat config: `typescript-eslint` type-aware, React Hooks/Refresh y `eslint-plugin-boundaries` (prohíbe que `application` importe `infrastructure`, que `shared`/`frontend` importen backend y que `e2e` importe internals).
 - Prettier 3.

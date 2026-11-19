@@ -65,14 +65,14 @@ y se usa solo desde Playwright.
 ## Tests
 
 ```bash
-# Unitarios (sin DB): 23 tests
+# Unitarios (sin DB): 24 tests
 podman compose -f compose.yaml --profile test run --rm tests npm run test:unit
 
-# Integración (Postgres real, base app_test, serial): 45 tests
+# Integración (Postgres real, base app_test, serial): 49 tests
 podman compose -f compose.yaml --profile test build tests
 podman compose -f compose.yaml --profile test run --rm tests
 
-# E2E Playwright (5 tests, proyecto de compose aislado)
+# E2E Playwright (6 tests, proyecto de compose aislado)
 make test-e2e
 ```
 

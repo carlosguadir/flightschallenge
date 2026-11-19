@@ -95,12 +95,13 @@ de carrera entre la suscripción y el snapshot REST.
 ## 3. Modelo de datos y migraciones
 
 El esquema vive en `public` y se crea desde SQL ordenado en
-`backend/src/database/migrations/001_init.sql`:
+`backend/src/database/migrations/001_init.sql` y `002_multi_seat_bookings.sql`:
 
 - `flights` con `status ∈ {SCHEDULED, DELAYED, CANCELLED}`, `sold_out` derivado y `version`.
 - `seats` con `status ∈ {AVAILABLE, HELD, BOOKED}`, `held_by_session`, `hold_expires_at`,
   `booking_id` y un `CHECK` que obliga a la forma correcta de cada estado.
-- `bookings` con `code` único, `seat_id` único, `idempotency_key` único y `request_hash`.
+- `bookings` como cabecera de reserva: `code` único, `idempotency_key` único, `request_hash` y total.
+- `booking_seats` como líneas: `seat_id` único, etiqueta y precio por asiento.
 - Índice parcial `seats_hold_expiry_idx ON seats (hold_expires_at) WHERE status = 'HELD'` para
   el sweeper.
 
@@ -112,9 +113,9 @@ CONSTRAINT seats_state_shape CHECK (
 )
 ```
 
-`bookings.seat_id UNIQUE` es la segunda línea de defensa: incluso un bug de lógica no puede
-producir dos bookings para el mismo asiento. El `CHECK` mantiene la máquina de estados coherente
-a nivel de base.
+`booking_seats.seat_id UNIQUE` es la segunda línea de defensa: incluso un bug de lógica no puede
+producir dos reservas confirmadas para el mismo asiento. El `CHECK` mantiene la máquina de estados
+coherente a nivel de base.
 
 Las migraciones se aplican al arrancar bajo `pg_advisory_xact_lock(hashtext('migrations'))`, con
 checksums y ledger `__migrations`; el seed es idempotente y usa UUIDv5 deterministas
@@ -226,13 +227,13 @@ Secuencia real de `ConfirmBooking`:
 1. Fuera de la transacción, buscar por `idempotency_key`: si existe y el hash coincide, devolver
    el booking original (`200`); si el hash difiere, `409 IDEMPOTENCY_CONFLICT`.
 2. Abrir la transacción del vuelo (advisory lock) y repetir la búsqueda dentro de ella.
-3. Bloquear la fila del asiento con `FOR UPDATE OF s` y verificar que pertenece al vuelo.
+3. Bloquear las filas de los asientos con `FOR UPDATE OF s` y verificar que pertenecen al vuelo.
 4. Rechazar vuelo `CANCELLED` con `409 FLIGHT_NOT_BOOKABLE`.
 5. Verificar propiedad y vigencia del hold. Si otro lo posee, `409 SEAT_UNAVAILABLE`; si expiró,
    re-chequear la idempotencia y responder replay o `410 HOLD_EXPIRED`.
 6. Ejecutar el pago fake (`TEST_OK`/`TEST_DECLINE`) con `PAYMENT_DELAY_MS`.
-7. Insertar el booking con un `SAVEPOINT` por intento de código (máximo 3), y actualizar el
-   asiento con una condición final de vigencia:
+7. Insertar la cabecera y las líneas de la reserva con un `SAVEPOINT` por intento de código
+   (máximo 3), y actualizar todos los asientos con una condición final de vigencia:
 
 ```sql
 UPDATE seats
@@ -241,7 +242,7 @@ SET status = 'BOOKED',
     hold_expires_at = NULL,
     booking_id = $3,
     version = version + 1
-WHERE id = $1
+WHERE id = ANY($1::uuid[])
   AND flight_id = $2
   AND status = 'HELD'
   AND held_by_session = $4
@@ -249,10 +250,10 @@ WHERE id = $1
 RETURNING id;
 ```
 
-Si el `UPDATE` no devuelve fila, el hold expiró durante el pago: se responde `410 HOLD_EXPIRED`
-con `{refunded:true}` y se hace rollback del booking. Los `UNIQUE` de `idempotency_key`,
-`bookings.seat_id` y `bookings.code` arbitran carreras concurrentes; el caso de uso relee el
-ganador para devolver un replay consistente.
+Si el `UPDATE` no devuelve todas las filas, al menos un hold expiró durante el pago: se responde
+`410 HOLD_EXPIRED` con `{refunded:true}` y se hace rollback de toda la reserva. Los `UNIQUE` de
+`idempotency_key`, `booking_seats.seat_id` y `bookings.code` arbitran carreras concurrentes; el
+caso de uso relee el ganador para devolver un replay consistente.
 
 ### 4.6 Sweeper y expiración lazy
 
@@ -345,19 +346,23 @@ administración está abierto en la demo y debe protegerse en producción.
 ```json
 {
   "flightId": "uuid",
-  "seatId": "uuid",
+  "seatIds": ["uuid", "uuid"],
   "passenger": { "name": "Ada Lovelace", "email": "ada@example.com" },
   "payment": { "method": "TEST_OK" }
 }
 ```
 
+La respuesta contiene un solo `code`, el total en `amountCents` y `seats: [{seatId, seatLabel,
+priceCents}]`.
+
 `Idempotency-Key` es un UUID obligatorio. El servidor calcula un SHA-256 canónico con orden fijo
 de campos, nombre recortado y email en minúsculas; nunca hashea el body crudo, headers ni
-timestamps. La primera confirmación devuelve `201`; un replay con el mismo hash devuelve `200` con
-el mismo código. Un mismo key con payload distinto devuelve `409 IDEMPOTENCY_CONFLICT`.
+timestamps. Una confirmación de 1–4 asientos bloquea todos los holds, cobra el total y devuelve un
+único código y una única reserva. La primera confirmación devuelve `201`; un replay con el mismo
+hash devuelve `200` con el mismo código. Un mismo key con payload distinto devuelve `409 IDEMPOTENCY_CONFLICT`.
 
-No se reciben datos de tarjeta: `payment.method` es un token. Un decline (`TEST_DECLINE`) deja el
-hold intacto y no crea fila en `bookings`.
+No se reciben datos de tarjeta: `payment.method` es un token. Un decline (`TEST_DECLINE`) deja los
+holds intactos y no crea fila en `bookings`.
 
 | HTTP | Código                      | Cuándo                                                    |
 | ---- | --------------------------- | --------------------------------------------------------- |
@@ -375,16 +380,16 @@ hold intacto y no crea fila en `bookings`.
 
 ## 8. Testing
 
-- **Unitarios (23):** reducer versionado, reconnect buffer, countdown, idempotencia —incluido el
+- **Unitarios (24):** reducer versionado, reconnect buffer, countdown, idempotencia —incluido el
   fallback de UUID fuera de contexto seguro—, hash, guards, Unit of Work, redacción de logs y
   fronteras de arquitectura.
-- **Integración (45):** Vitest serial contra PostgreSQL real en la base `app_test`, con migraciones,
+- **Integración (49):** Vitest serial contra PostgreSQL real en la base `app_test`, con migraciones,
   seed determinista y reset entre archivos. Cubren concurrencia de 50 sesiones, idempotencia,
   límite de holds, sweeper, carreras de booking/cancelación, rate limit dedicado, cookie/trust
   proxy, sockets reales y el hook de reset de e2e.
-- **E2E (5):** Playwright con `workers: 1`, contextos aislados por usuario y un vuelo por test. El
+- **E2E (6):** Playwright con `workers: 1`, contextos aislados por usuario y un vuelo por test. El
   perfil `e2e` usa TTL de 5s y `PAYMENT_DELAY_MS=50`; cada test hace `POST /api/test/reset` con el
-  token del perfil. Cubren hold cruzado, booking + ticket, cambio de estado administrativo,
+  token del perfil. Cubren hold cruzado, booking + ticket, reserva de dos asientos con un código, cambio de estado administrativo,
   expiración con dashboard y axe WCAG 2.1 AA. El bug de `crypto.randomUUID` en un origen HTTP no
   seguro lo detectó esta suite, no una revisión manual.
 
