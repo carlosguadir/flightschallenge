@@ -1,6 +1,6 @@
 # Bitácora de uso de IA
 
-Este documento es obligatorio para el KATA (§6.1). Explica de forma simple qué se le pidió a la IA en cada fase, qué se obtuvo, qué errores aparecieron y cuánto tiempo se ahorró o se invirtió. Se actualizó al final de cada fase.
+Este documento es obligatorio para el KATA (§6.1). Explica de forma simple qué se le pidió a la IA en cada fase, qué se obtuvo, qué errores aparecieron y cuánto tiempo se ahorró o se invirtió. Incluye los prompts que dirigieron la implementación y un resumen de los direccionamientos más importantes del ingeniero.
 
 ## Palabras clave
 
@@ -23,34 +23,120 @@ Este documento es obligatorio para el KATA (§6.1). Explica de forma simple qué
 | ---------- | -------------------------- | ---------------------------------------------------- | -------------------------------------------------------- |
 | 2026-11-18 | Claude Code (CLI, VS Code) | Modelo reportado por la sesión: `deepseek-flash[1m]` | Planificación, revisión del plan y arranque de la fase 0 |
 
+## Direccionamientos importantes del ingeniero
+
+Estas son las decisiones que más marcaron el proyecto. No son todas las preguntas, sino las que cambiaron el alcance, la arquitectura o la forma de trabajar.
+
+- **Podman, no Docker.** La ejecución local y el CI debían usar Podman. Esto obligó a ajustar contenedores, compose y documentación.
+- **No modificar ni reactivar vuelos.** La cancelación operativa sí existe, pero `CANCELLED` es terminal. No se implementó edición, reactivación ni cancelación de una reserva ya comprada.
+- **Respetar el alcance del reto.** El máximo de 4 holds por sesión y vuelo era un requisito, no un detalle negociable.
+- **Una reserva, un código, hasta 4 asientos.** La primera implementación reservaba un asiento por operación. El ingeniero corrigió el rumbo y exigió un solo código para todo el grupo.
+- **Diseño antes de codificar.** DRY, SOLID, patrones, ESLint y revisión de arquitectura se pidieron antes y durante la implementación.
+- **Validar antes de confirmar.** Los cambios debían probarse antes de hacer commit; «valida primero luego confirma cambios» quedó como regla.
+- **La interfaz solo debía cambiar de color.** El rediseño inspirado en Latam no debía alterar comportamiento, rutas ni estructura.
+- **El healthcheck debía mirar el sistema completo.** No bastaba con la base de datos: también debía comprobar que el canal de tiempo real acepta conexiones.
+- **La ruta de tiempo real sería `/realtime`.** No se aceptó conservar la ruta por defecto de Socket.io.
+- **Seguridad y limpieza.** Se pidió revisar CORS, CSRF y rate limiting, y eliminar módulos o piezas que no aportaran valor.
+- **Documentación de la API.** Swagger/OpenAPI se agregó como parte del entregable.
+- **Un pasajero por asiento quedó como TODO.** La reserva actual comparte el pasajero del grupo; el código deja explícito el trabajo futuro.
+- **Commits por fase o grupo lógico.** Formato `(feat|chore|style|refactor|test): descripción`, sin trailers.
+- **SPA estática con proxy same-origin.** Se evaluó Next.js y se descartó: React + Vite + nginx cubre el alcance sin costo extra.
+
+## Registro de prompts de implementación
+
+Esta lista reconstruye, en orden, los mensajes que dirigieron la implementación. Se conserva el texto tal como se escribió, incluidas sus abreviaturas. Se excluyen los pedidos puramente operativos, como confirmar cambios o limpiar el historial, que no cambiaron el comportamiento del sistema.
+
+### Planificación y arquitectura
+
+- «Before running any code let's plan and define architecture… generate a MD» → se creó el plan y el modelo de arquitectura.
+- «considerar PostgreSQL en Docker, Docker por defecto, Vitest y Playwright» → elección inicial del stack; después Docker se reemplazó por Podman.
+- «fix the sintax en review the PLAN.md» → revisión y corrección del plan.
+- «apply all fixes» → se aplicaron los hallazgos de la revisión.
+- «modifica el plan no usaremos docker usaremos podman» → cambio transversal a Podman.
+- «El plan parece estar listo, hay algo que se deba considerar antes de pasar a la fase de implementación ?» → revisión previa a implementar.
+- «Explicame mas sobre el punto 1, no lo entiendo bien» y «Procede y muestrame detalles del numero 2» → aclaración y aplicación de los primeros puntos.
+- «que hay de los puntos 3-10, hablame del 3» y «aplica el punto 3» → revisión y aplicación de los puntos pendientes.
+- «procede con las acciones sugeridas para los puntos 4-10» → cierre de las mejoras del plan.
+- «No that plan is ready what about DRY/SOLID, Patterns ?» → revisión de principios de diseño.
+- «okay ahora revisa si el plan contiene texto no necesario para la implementación requiero reducir su tamaño» → el material no implementable se movió a un apéndice.
+- «el plan contempla la opción de cancelar vuelo o modificar vuelo ?» → se separó la cancelación operativa de la edición de vuelos.
+- «ignora el requerimiento no lo vamos a contemplar» → se excluyó modificar o reactivar vuelos.
+- «la comunicación entre front y back como se haría hay un proxy para servirse en un mismo puerto ?» → nginx mismo origen, proxy para API y tiempo real, y cookie de sesión.
+- «que rutas disponibles tiene la aplicación de react ?» → se fijaron las cuatro rutas del frontend.
+- «algunos de estas rutas de react valdría la pena desde una perspectiva de ingeniería de software tenerlos con nextjs ? la compilación estática es suficiente ?» → se decidió mantener una SPA estática con Vite.
+- «La convensión de git debe ser que cada fase se hace commit agrupando cambios con la siguiente estructura de mensajes "(feat|chore|style|refactor|test) {message_changes}".» → un commit por fase o grupo lógico, sin trailers.
+- «eslint esta contemplado en las herramientas del codigo ?» → se incorporó ESLint al control de calidad.
+- «agregar pipelines y Terraform», «seguridad, logs y tracing» y «¿Drizzle o Prisma?» → se documentaron como ruta de producción; no se implementaron en el entregable.
+- «¿qué otro aspecto podría estar olvidando?» y «¿por qué monolito modular, y qué alternativas hay?» → análisis de brechas y decisión de arquitectura.
+- Preguntas sobre Redis y el hold → se documentó el ciclo de vida del hold; Redis no era necesario para el alcance.
+
+### Implementación por fases
+
+- «inicia la fase 0» → base del proyecto, contratos, sesión, migraciones, bloqueo por vuelo y holds.
+- «valida primero luego confirma cambios» → la validación se volvió requisito antes de confirmar.
+- «procede a implementar la phase 1» → búsqueda, holds, liberación y expiración.
+- «procede con la fase 2» → reserva, pago falso, idempotencia y consulta de ticket.
+- «procede con la fase 3» → tiempo real, métricas y administración de estados.
+- «procede con la fase 4» → búsqueda, mapa de asientos, checkout, ticket y dashboard.
+- «what are you doing what is striggling to complete the task just tell me the symptom» → se pidió un diagnóstico claro antes de seguir.
+- «comprendo continua» → continuación de la fase 4.
+- «proceed with next phase» → Playwright, documentación y CI.
+
+### Revisiones y ajustes posteriores
+
+- «Let's change style in UI frontend. Add a clear colors like Latam Airlines. Just the color do no change something else» → solo se cambiaron colores y estilos visuales.
+- «can this health check also review the socket live accepting connections ?» → el healthcheck pasó a comprobar base de datos y gateway.
+- «why this module exist, it implements nothing» → se eliminó un módulo vacío.
+- «what is a suggested path for this route ? I do not want preserve the default one» → se evaluó una ruta propia.
+- «apply /realtime for back and frontend» → gateway y cliente quedaron en `/realtime`.
+- «is this necessary ? looks none is using ?» → se eliminó una pieza sin uso.
+- «does this test module add value could we consider remove ?» → se revisó el valor del módulo de pruebas.
+- «does this factory cors config only for allowed frontend ?» → CORS quedó limitado al frontend permitido.
+- «CSRF and rate limit is included ?» → se revisaron CSRF y límite de peticiones.
+- «add swagger is a feature that I would like have here, too much on add it ?» → se agregó Swagger/OpenAPI.
+- «explain this code ? what is it doing ¡» y «should this be haved in mind ? It does not check flight status. A cancelled flight’s seats are still valid seat-shape rows.» → se revisó la validación del estado del vuelo antes de reservar.
+- «When I bookd 4 seats what i'm seeing in frontend is that lock the 4 sets but once user confirm book only book one seat not the 4 seats. I was expecting tha at selecting 4 seats and click on confirm the app should reserve the 4 is this doable ?» → se detectó que la reserva solo guardaba un asiento.
+- «do not run implementations» → no se implementó nada hasta aclarar el requisito.
+- «it's doable in 15 minutes, do you understand well the requirements and it's changes ?» → se alineó el alcance antes de tocar código.
+- «the 4 seats max was part of requirements of challengue» → se confirmó que el límite de 4 era parte del reto.
+- «one reservation with one code for four seats this is what i want» → una cabecera de reserva y varias líneas de asiento, con un solo código.
+- «let's add a TODO in module where this should be done in future one ticket one passenger» → se dejó documentado el trabajo de un pasajero por asiento.
+
+### Consultas de comportamiento
+
+- «el sistema permite cancelar un vuelo ?» → se confirmó la cancelación operativa y sus límites.
+- «dame un CURL para cancelar un vuelo» → se documentó la llamada al endpoint administrativo.
+- «o existeuna UI para cancelar vuelo ?» → se confirmó que no hay UI de administración.
+- «si llamo al endpoint con CURL que pasaría en el front de ese vuelo ?» → se documentó el efecto en búsqueda, mapa, checkout y dashboard.
+
 ## Fase 0 — Base del proyecto, Podman, contratos y seguridad
 
-## Qué se pidió y qué se hizo
+### Planificación inicial
 
 1. Definir el plan y la arquitectura
-   * Prompt: «Before running any code let's plan and define architecture… generate a MD», luego «considerar PostgreSQL en Docker, Docker por defecto, Vitest y Playwright».
-   * Resultado: `PLAN.md` con monolito modular, NestJS + React, Socket.io, Postgres, bloqueo atómico de asientos con expiración, contrato en tiempo real, API y estrategia de pruebas.
+   - Prompt: «Before running any code let's plan and define architecture… generate a MD», luego «considerar PostgreSQL en Docker, Docker por defecto, Vitest y Playwright».
+   - Resultado: el documento de planificación con monolito modular, NestJS + React, Socket.io, Postgres, bloqueo atómico de asientos con expiración, contrato en tiempo real, API y estrategia de pruebas.
 2. Afinar concurrencia y caché
-   * Prompt: preguntas sobre dónde usar Redis, la estrategia del hold y cómo funciona el bloqueo de 5-10 minutos.
-   * Resultado: se documentó dónde sí y dónde no usar Redis, y se agregó el ciclo de vida del hold con su diagrama de estados.
+   - Prompt: preguntas sobre dónde usar Redis, la estrategia del hold y cómo funciona el bloqueo de 5-10 minutos.
+   - Resultado: se documentó dónde sí y dónde no usar Redis, y se agregó el ciclo de vida del hold con su diagrama de estados.
 3. Producción, seguridad y observabilidad
-   * Prompt: «agregar pipelines y Terraform» (Kubernetes + Helm, AWS, GitHub Actions, Postgres administrado, dominio como TODO), luego «seguridad, logs y tracing» y «¿Drizzle o Prisma?».
-   * Resultado: secciones de despliegue, seguridad, logs estructurados y OpenTelemetry, más la justificación de Drizzle frente a Prisma.
+   - Prompt: «agregar pipelines y Terraform» (Kubernetes + Helm, AWS, GitHub Actions, Postgres administrado, dominio como TODO), luego «seguridad, logs y tracing» y «¿Drizzle o Prisma?».
+   - Resultado: se documentaron como ruta de producción fuera del alcance, junto con seguridad, logs estructurados, OpenTelemetry y la justificación de Drizzle frente a Prisma.
 4. Revisar huecos y arquitectura
-   * Prompt: «¿qué otro aspecto podría estar olvidando?» y «¿por qué monolito modular, y qué alternativas hay?».
-   * Resultado: análisis de brechas con alcance por ítem, y un ADR con reglas de desacoplamiento, orden de extracción a servicios y alternativas.
+   - Prompt: «¿qué otro aspecto podría estar olvidando?» y «¿por qué monolito modular, y qué alternativas hay?».
+   - Resultado: análisis de brechas con alcance por ítem, y un ADR con reglas de desacoplamiento, orden de extracción a servicios y alternativas.
 
-## Errores de la IA y correcciones
+### Errores de la planificación
 
-* Los módulos `seats`, `bookings` y `metrics` compartían tablas y transacción, así que no eran extraíbles. Se reagruparon por contexto (`reservations`, `catalog`, etc.) con reglas de dependencia verificadas en CI.
-* El pago corría antes de la transacción y los eventos se emitían en memoria. Se agregaron un estado de reserva, la tabla `payments` y un outbox.
-* El `sessionId` lo elegía el cliente en localStorage. Se cambió por una cookie firmada y `HttpOnly` emitida por el servidor.
+- Los módulos `seats`, `bookings` y `metrics` compartían tablas y transacción, así que no eran extraíbles. Se reagruparon por contexto (`reservations`, `catalog`, etc.) con reglas de dependencia verificadas en CI.
+- En la planificación se propusieron una tabla `payments` y un outbox. Se descartaron para el alcance final: se usó un pago falso y la publicación de eventos después del commit.
+- El `sessionId` lo elegía el cliente en localStorage. Se cambió por una cookie firmada y `HttpOnly` emitida por el servidor.
 
-## Impacto estimado
+### Impacto de la planificación
 
-Pendiente de consolidar al final. Estimación inicial: ~3 h ahorradas en investigación y redacción del plan, y ~1 h invertida en cuestionar y corregir las propuestas de la IA. Ajusta estas cifras a tu tiempo real.
+Pendiente de consolidar al final. Estimación inicial: ~3 h ahorradas en investigación y redacción del plan, y ~1 h invertida en cuestionar y corregir las propuestas de la IA. La tabla final reemplaza esta estimación inicial.
 
-### Qué se pidió y qué se hizo
+### Implementación de la fase 0
 
 1. **Revisar y corregir el plan**
    - Prompt: «fix the syntax en review the PLAN.md», seguido de «apply all fixes», «modifica el plan no usaremos docker usaremos podman» y una revisión de DRY/SOLID/patrones.
