@@ -1,41 +1,55 @@
-import { useQuery } from '@tanstack/react-query';
 import type { JSX } from 'react';
+import { Link, Route, Routes } from 'react-router-dom';
 
-interface HealthResponse {
-  status: 'ok';
-  db: 'up';
-}
+import { ConnectionBadge } from './components/Badges';
+import { TicketPage } from './features/booking/TicketPage';
+import { DashboardPage } from './features/dashboard/DashboardPage';
+import { SearchPage } from './features/search/SearchPage';
+import { SeatMapPage } from './features/seatmap/SeatMapPage';
 
-async function fetchHealth(): Promise<HealthResponse> {
-  const response = await fetch('/api/health');
-  if (!response.ok) {
-    throw new Error(`Health check failed with ${response.status}`);
-  }
-  return (await response.json()) as HealthResponse;
+function NotFound(): JSX.Element {
+  return (
+    <section className="page">
+      <div className="card empty-state">
+        <h1>Page not found</h1>
+        <p className="muted">The route you followed does not exist.</p>
+        <Link className="button button-primary" to="/">
+          Back to search
+        </Link>
+      </div>
+    </section>
+  );
 }
 
 export function App(): JSX.Element {
-  const health = useQuery({ queryKey: ['health'], queryFn: fetchHealth, retry: 1 });
-
   return (
-    <main className="shell">
-      <p className="eyebrow">Flight Booking Challenge</p>
-      <h1>Seats, holds and bookings in real time.</h1>
-      <p className="lede">
-        Phase 0 skeleton: the API, PostgreSQL, Podman Compose, session cookie and test harness are
-        wired. Search, seat map and live updates arrive in the next phases.
-      </p>
+    <div className="app-shell">
+      <header className="topbar">
+        <Link className="brand" to="/">
+          <span className="brand-mark" aria-hidden="true">
+            FB
+          </span>
+          <span>Flight Booking</span>
+        </Link>
+        <nav className="topnav" aria-label="Main navigation">
+          <Link to="/">Search</Link>
+        </nav>
+        <ConnectionBadge />
+      </header>
 
-      <section className="status" aria-live="polite">
-        <span className={health.isSuccess ? 'dot dot-ok' : 'dot dot-pending'} />
-        <span>
-          {health.isSuccess
-            ? `API ${health.data.status} · database ${health.data.db}`
-            : health.isError
-              ? 'API unavailable'
-              : 'Checking API…'}
-        </span>
-      </section>
-    </main>
+      <main className="content">
+        <Routes>
+          <Route path="/" element={<SearchPage />} />
+          <Route path="/flights/:flightId" element={<SeatMapPage />} />
+          <Route path="/booking/:code" element={<TicketPage />} />
+          <Route path="/dashboard/:flightId" element={<DashboardPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </main>
+
+      <footer className="footer">
+        <p>Flight Booking Challenge · live inventory over one transactional core.</p>
+      </footer>
+    </div>
   );
 }

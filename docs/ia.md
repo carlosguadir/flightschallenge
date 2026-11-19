@@ -80,3 +80,21 @@ Pendiente de consolidar. La fase 2 se apoyó en el esquema y el Unit of Work exi
 ### Impacto estimado
 
 Pendiente de consolidar. La fase 3 fue corta porque los eventos ya se publicaban after-commit y el contrato de versiones existía; el mayor esfuerzo fue el orden de inicialización del gateway/publisher y la ventana de batching.
+
+## Fase 4 — Frontend completo
+
+### Prompts y casos de uso
+
+- **Prompt:** «procede con la fase 4», seguido de la corrección de alcance «valida primero luego confirma cambios».
+- **Resultado:** cuatro rutas React (búsqueda, seat map, ticket, dashboard), reducer versionado con reconnect buffer, countdown con offset de servidor, checkout idempotente, tickets, feed de eventos, indicador de conexión, navegación por teclado en el seat map y 12 tests unitarios del frontend.
+
+### Casos en los que la IA se equivocó y cómo se corrigió
+
+- **Selección preservada tras expirar.** El reducer conservaba el asiento seleccionado después de un snapshot aunque ya no fuera mío o estuviera `BOOKED`. Se corrigió para mantenerlo solo si sigue `AVAILABLE` o `HELD` con `isMine`.
+- **Selector de asiento ambiguo en la validación.** El script de dos pestañas usaba `.seat-available`, que también matcheaba el swatch de la leyenda, así que el click no hacía nada. Se cambió a `button.seat-available`.
+- **Chrome `--dump-dom` colgado.** La SPA mantiene un WebSocket abierto y el modo dump no terminaba. Se reemplazó por Chrome DevTools Protocol para navegar, evaluar el DOM y capturar screenshots.
+- **Axe vía npm colgado.** La instalación temporal de `axe-core` no terminó; se descargó `axe.min.js` desde CDN y se inyectó por CDP. Resultado: 0 violaciones WCAG 2.1 AA en las cuatro rutas.
+
+### Impacto estimado
+
+Pendiente de consolidar. La fase 4 concentró el mayor volumen de código de UI; el reducer y los tests puros permitieron validar la sincronización sin depender de un navegador, y el smoke con CDP cubrió dos pestañas, booking y ticket reales.

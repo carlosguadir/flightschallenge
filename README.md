@@ -2,7 +2,18 @@
 
 Sistema de reserva de vuelos con holds temporales, booking y actualizaciones en tiempo real. Monolito modular NestJS + React, PostgreSQL 16 y Podman Compose.
 
-**Estado actual: fase 3 (realtime y administración).** Ya funcionan búsqueda/detalle de vuelos, snapshot del seat map, holds idempotentes con máximo 4 por sesión y vuelo, release, expiración por sweeper + lazy expiry, guards de estado, booking con pago simulado, idempotencia y lookup, gateway Socket.io con rooms y join ack, métricas batched y transiciones de estado administrativas. La UI completa llega en las fases 4–5.
+**Estado actual: fase 4 (frontend completo).** Ya funcionan búsqueda/detalle de vuelos, snapshot del seat map, holds idempotentes con máximo 4 por sesión y vuelo, release, expiración por sweeper + lazy expiry, guards de estado, booking con pago simulado, idempotencia y lookup, gateway Socket.io con rooms y join ack, métricas batched, transiciones administrativas y las cuatro rutas de React con sincronización en vivo, reconnect buffer y checkout accesible. La suite Playwright y el cierre de docs/CI llegan en la fase 5.
+
+### Rutas del frontend
+
+| Ruta                   | Pantalla                                             |
+| ---------------------- | ---------------------------------------------------- |
+| `/`                    | Búsqueda con resultados que se actualizan por socket |
+| `/flights/:id`         | Seat map, hold/countdown, checkout y release         |
+| `/booking/:code`       | Ticket por código + email                            |
+| `/dashboard/:flightId` | Contadores, ocupación y feed de eventos en vivo      |
+
+El seat map mantiene un buffer de eventos hasta recibir el ack de `flight.join` y el snapshot REST; luego drena por versión. El checkout reutiliza `Idempotency-Key` entre retries.
 
 ### Endpoints disponibles
 
@@ -96,6 +107,10 @@ npm run typecheck
 npm run format:check
 npm run test:unit
 ```
+
+- 22 tests unitarios (10 backend + 12 frontend): reducer versionado, reconnect buffer, countdown, idempotencia, guards, UoW y redacción de logs.
+- 39 tests de integración en el perfil `test` de Podman.
+- Axe sin violaciones en las cuatro rutas (auditoría WCAG 2.1 AA).
 
 - ESLint 9 flat config: `typescript-eslint` type-aware, React Hooks/Refresh y `eslint-plugin-boundaries` (prohíbe que `application` importe `infrastructure` y que `shared`/`frontend` importen backend).
 - Prettier 3.
