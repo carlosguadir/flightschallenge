@@ -39,7 +39,9 @@ export class DatabaseService implements OnModuleDestroy {
     if (!SEED_ENVIRONMENTS.has(this.config.nodeEnv)) {
       throw new Error('Test reset is disabled outside development/test/e2e/staging');
     }
-    await this.pool.query('TRUNCATE bookings, seats, flights RESTART IDENTITY CASCADE');
+    await this.pool.query(
+      'TRUNCATE booking_seats, bookings, seats, flights RESTART IDENTITY CASCADE',
+    );
     await seedDatabase(this.pool);
   }
 

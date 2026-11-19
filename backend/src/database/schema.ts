@@ -48,10 +48,6 @@ export const bookings = pgTable('bookings', {
   flightId: uuid('flight_id')
     .notNull()
     .references(() => flights.id),
-  seatId: uuid('seat_id')
-    .notNull()
-    .unique()
-    .references(() => seats.id),
   sessionId: text('session_id').notNull(),
   passengerName: text('passenger_name').notNull(),
   passengerEmail: text('passenger_email').notNull(),
@@ -60,4 +56,16 @@ export const bookings = pgTable('bookings', {
   idempotencyKey: text('idempotency_key').notNull().unique(),
   requestHash: text('request_hash').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const bookingSeats = pgTable('booking_seats', {
+  bookingId: uuid('booking_id')
+    .notNull()
+    .references(() => bookings.id, { onDelete: 'cascade' }),
+  seatId: uuid('seat_id')
+    .notNull()
+    .unique()
+    .references(() => seats.id),
+  seatLabel: text('seat_label').notNull(),
+  priceCents: integer('price_cents').notNull(),
 });

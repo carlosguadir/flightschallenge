@@ -9,7 +9,7 @@ import type { BookingRequest } from '@flight/shared';
 export function hashBookingRequest(request: BookingRequest): string {
   const canonical = JSON.stringify({
     flightId: request.flightId,
-    seatId: request.seatId,
+    seatIds: [...request.seatIds].sort(),
     passenger: {
       name: request.passenger.name.trim(),
       email: request.passenger.email.trim().toLowerCase(),

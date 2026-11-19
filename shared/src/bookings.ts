@@ -14,9 +14,23 @@ export const PassengerSchema = z.object({
 
 export type Passenger = z.infer<typeof PassengerSchema>;
 
+export const BookingSeatSchema = z.object({
+  seatId: z.string().uuid(),
+  seatLabel: z.string(),
+  priceCents: z.number().int().nonnegative(),
+});
+
+export type BookingSeat = z.infer<typeof BookingSeatSchema>;
+
 export const BookingRequestSchema = z.object({
   flightId: z.string().uuid(),
-  seatId: z.string().uuid(),
+  seatIds: z
+    .array(z.string().uuid())
+    .min(1)
+    .max(4)
+    .refine((seatIds) => new Set(seatIds).size === seatIds.length, {
+      message: 'seatIds must be unique',
+    }),
   passenger: PassengerSchema,
   payment: z.object({ method: PaymentMethodSchema }),
 });
@@ -26,8 +40,7 @@ export type BookingRequest = z.infer<typeof BookingRequestSchema>;
 export const BookingResponseSchema = z.object({
   code: z.string().length(6),
   flightId: z.string().uuid(),
-  seatId: z.string().uuid(),
-  seatLabel: z.string(),
+  seats: z.array(BookingSeatSchema).min(1).max(4),
   amountCents: z.number().int().nonnegative(),
   currency: z.string().length(3),
   passenger: PassengerSchema,
@@ -58,7 +71,7 @@ export const BookingLookupResponseSchema = z.object({
   origin: z.string().length(3),
   destination: z.string().length(3),
   departureAt: z.string(),
-  seatLabel: z.string(),
+  seats: z.array(BookingSeatSchema).min(1).max(4),
   passengerName: z.string(),
   amountCents: z.number().int().nonnegative(),
   currency: z.string().length(3),

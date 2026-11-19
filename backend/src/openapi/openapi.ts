@@ -191,9 +191,9 @@ registry.registerPath({
   method: 'post',
   path: '/api/bookings',
   tags: ['Bookings'],
-  summary: 'Confirm a booking',
+  summary: 'Confirm one reservation for one to four held seats',
   description:
-    'Requires an Idempotency-Key UUID. The first confirmation returns 201; a replay with the same payload returns 200.',
+    'Requires an Idempotency-Key UUID. All seatIds must be held by the same session and flight. The whole reservation is all-or-nothing and returns one code and the total amount. The first confirmation returns 201; a replay with the same payload returns 200.',
   security: [{ sessionCookie: [] }],
   request: {
     headers: z.object({

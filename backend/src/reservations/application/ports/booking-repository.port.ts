@@ -1,11 +1,16 @@
 import type { DbTransaction } from '../../../shared-kernel';
 
+export interface BookingSeatRecord {
+  seatId: string;
+  seatLabel: string;
+  priceCents: number;
+}
+
 export interface BookingRecord {
   id: string;
   code: string;
   flightId: string;
-  seatId: string;
-  seatLabel: string;
+  seats: BookingSeatRecord[];
   sessionId: string;
   passengerName: string;
   passengerEmail: string;
@@ -20,8 +25,7 @@ export interface NewBooking {
   id: string;
   code: string;
   flightId: string;
-  seatId: string;
-  seatLabel: string;
+  seats: BookingSeatRecord[];
   sessionId: string;
   passengerName: string;
   passengerEmail: string;
@@ -38,7 +42,7 @@ export interface BookingLookupRecord {
   origin: string;
   destination: string;
   departureAt: Date;
-  seatLabel: string;
+  seats: BookingSeatRecord[];
   passengerName: string;
   amountCents: number;
   currency: string;

@@ -21,7 +21,7 @@ export class LookupBooking {
       origin: booking.origin,
       destination: booking.destination,
       departureAt: booking.departureAt.toISOString(),
-      seatLabel: booking.seatLabel,
+      seats: booking.seats,
       passengerName: booking.passengerName,
       amountCents: booking.amountCents,
       currency: booking.currency,

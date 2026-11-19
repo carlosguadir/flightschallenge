@@ -35,6 +35,13 @@ export interface ConfirmBookingResult {
 
 const BOOKING_CODE_ATTEMPTS = 3;
 
+/**
+ * TODO: support one passenger per seat.
+ * The current reservation reuses the single BookingRequest passenger for every
+ * seat. Future work should store passenger data per booking_seats line (or in
+ * a booking_passengers table), update the request/response contracts and the
+ * idempotency hash, and render each passenger on the ticket.
+ */
 @Injectable()
 export class ConfirmBooking {
   constructor(
@@ -48,7 +55,8 @@ export class ConfirmBooking {
   ) {}
 
   async execute(command: ConfirmBookingCommand): Promise<ConfirmBookingResult> {
-    const requestHash = hashBookingRequest(command);
+    const seatIds = [...command.seatIds].sort();
+    const requestHash = hashBookingRequest({ ...command, seatIds });
 
     const existing = await this.bookings.findByKey(command.idempotencyKey);
     if (existing) {
@@ -65,20 +73,25 @@ export class ConfirmBooking {
           return this.replay(existingInTransaction, requestHash);
         }
 
-        const seat = await this.seats.lockForBooking(tx, command.flightId, command.seatId);
-        if (!seat) {
+        const seats = await this.seats.lockForBooking(tx, command.flightId, seatIds);
+        if (seats.length !== seatIds.length) {
           throw new AppError('SEAT_UNAVAILABLE', 409, 'Seat does not belong to this flight');
         }
 
-        if (seat.flightStatus === 'CANCELLED') {
+        if (seats.some((seat) => seat.flightStatus === 'CANCELLED')) {
           throw new AppError('FLIGHT_NOT_BOOKABLE', 409, 'Flight is cancelled');
         }
 
-        const owned =
-          seat.status === 'HELD' && seat.heldBySession === command.sessionId && seat.holdActive;
+        const heldByAnotherSession = seats.some(
+          (seat) => seat.heldBySession !== null && seat.heldBySession !== command.sessionId,
+        );
+        const owned = seats.every(
+          (seat) =>
+            seat.status === 'HELD' && seat.heldBySession === command.sessionId && seat.holdActive,
+        );
 
         if (!owned) {
-          if (seat.status === 'HELD' && seat.heldBySession !== command.sessionId) {
+          if (heldByAnotherSession) {
             throw new AppError('SEAT_UNAVAILABLE', 409, 'Seat is held by another session');
           }
 
@@ -90,10 +103,16 @@ export class ConfirmBooking {
           throw new AppError('HOLD_EXPIRED', 410, 'Hold is not active');
         }
 
+        const orderedSeats = [...seats].sort((left, right) =>
+          left.label.localeCompare(right.label, undefined, { numeric: true }),
+        );
+        const amountCents = orderedSeats.reduce((total, seat) => total + seat.priceCents, 0);
+        const currency = orderedSeats[0]?.currency ?? 'USD';
+
         const payment = await this.payments.charge({
           method: command.payment.method,
-          amountCents: seat.priceCents,
-          currency: seat.currency,
+          amountCents,
+          currency,
         });
 
         if (payment.status === 'DECLINED') {
@@ -103,13 +122,16 @@ export class ConfirmBooking {
         const booking = await this.insertWithCodeRetry(tx, {
           id: this.ids.uuid(),
           flightId: command.flightId,
-          seatId: command.seatId,
-          seatLabel: seat.label,
+          seats: orderedSeats.map((seat) => ({
+            seatId: seat.seatId,
+            seatLabel: seat.label,
+            priceCents: seat.priceCents,
+          })),
           sessionId: command.sessionId,
           passengerName: command.passenger.name,
           passengerEmail: command.passenger.email,
-          amountCents: seat.priceCents,
-          currency: seat.currency,
+          amountCents,
+          currency,
           idempotencyKey: command.idempotencyKey,
           requestHash,
         });
@@ -121,31 +143,33 @@ export class ConfirmBooking {
                hold_expires_at = NULL,
                booking_id = $3,
                version = version + 1
-           WHERE id = $1
+           WHERE id = ANY($1::uuid[])
              AND flight_id = $2
              AND status = 'HELD'
              AND held_by_session = $4
              AND hold_expires_at > now()
            RETURNING id`,
-          [command.seatId, command.flightId, booking.id, command.sessionId],
+          [seatIds, command.flightId, booking.id, command.sessionId],
         );
 
-        if (updated.rowCount !== 1) {
+        if (updated.rowCount !== seatIds.length) {
           throw new AppError('HOLD_EXPIRED', 410, 'Hold expired during payment', {
             refunded: true,
           });
         }
 
-        const state = await this.flightState.recordSeatChange(tx, command.flightId, 1);
+        const state = await this.flightState.recordSeatChange(tx, command.flightId, seatIds.length);
 
-        this.events.publish({
-          name: 'seat.booked',
-          payload: {
-            flightId: command.flightId,
-            seatId: command.seatId,
-            label: seat.label,
-            version: state.seatEventVersions[0] ?? state.flightVersion,
-          },
+        orderedSeats.forEach((seat, index) => {
+          this.events.publish({
+            name: 'seat.booked',
+            payload: {
+              flightId: command.flightId,
+              seatId: seat.seatId,
+              label: seat.label,
+              version: state.seatEventVersions[index] ?? state.flightVersion,
+            },
+          });
         });
 
         if (state.soldOutToggled) {
@@ -171,7 +195,7 @@ export class ConfirmBooking {
           return this.replay(winner, requestHash);
         }
 
-        if (error.constraint === 'bookings_seat_id_key') {
+        if (error.constraint === 'booking_seats_seat_id_key') {
           throw new AppError('SEAT_UNAVAILABLE', 409, 'Seat is already booked');
         }
         if (error.constraint === 'bookings_code_key') {
@@ -229,8 +253,11 @@ export class ConfirmBooking {
     return {
       code: record.code,
       flightId: record.flightId,
-      seatId: record.seatId,
-      seatLabel: record.seatLabel,
+      seats: record.seats.map((seat) => ({
+        seatId: seat.seatId,
+        seatLabel: seat.seatLabel,
+        priceCents: seat.priceCents,
+      })),
       amountCents: record.amountCents,
       currency: record.currency,
       passenger: {

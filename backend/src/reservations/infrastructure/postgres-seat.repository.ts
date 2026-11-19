@@ -151,8 +151,8 @@ export class PostgresSeatRepository implements SeatRepository {
   async lockForBooking(
     tx: DbTransaction,
     flightId: string,
-    seatId: string,
-  ): Promise<BookingSeat | null> {
+    seatIds: string[],
+  ): Promise<BookingSeat[]> {
     const result = await tx.query<{
       id: string;
       label: string;
@@ -173,15 +173,13 @@ export class PostgresSeatRepository implements SeatRepository {
               f.status AS flight_status
        FROM seats s
        JOIN flights f ON f.id = s.flight_id
-       WHERE s.id = $1 AND s.flight_id = $2
+       WHERE s.id = ANY($1::uuid[]) AND s.flight_id = $2
+       ORDER BY s.id
        FOR UPDATE OF s`,
-      [seatId, flightId],
+      [seatIds, flightId],
     );
 
-    const row = result.rows[0];
-    if (!row) return null;
-
-    return {
+    return result.rows.map((row) => ({
       seatId: row.id,
       label: row.label,
       status: row.status,
@@ -190,7 +188,7 @@ export class PostgresSeatRepository implements SeatRepository {
       priceCents: row.price_cents,
       currency: row.currency.trim(),
       flightStatus: row.flight_status,
-    };
+    }));
   }
 
   async listByFlight(flightId: string, sessionId: string): Promise<Seat[]> {

@@ -57,7 +57,7 @@ export interface SeatRepository {
   listByFlight(flightId: string, sessionId: string): Promise<Seat[]>;
   listFlightsWithExpiredHolds(tx: DbTransaction): Promise<string[]>;
   expireSeats(tx: DbTransaction, flightId: string): Promise<ExpiredSeat[]>;
-  lockForBooking(tx: DbTransaction, flightId: string, seatId: string): Promise<BookingSeat | null>;
+  lockForBooking(tx: DbTransaction, flightId: string, seatIds: string[]): Promise<BookingSeat[]>;
 }
 
 export const SEAT_REPOSITORY = Symbol('SEAT_REPOSITORY');
