@@ -40,8 +40,12 @@ export function generateIdempotencyKey(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function storageKey(flightId: string, seatId: string): string {
-  return `${PREFIX}${flightId}:${seatId}`;
+function reservationKey(seatIds: readonly string[]): string {
+  return [...seatIds].sort().join(',');
+}
+
+function storageKey(flightId: string, seatIds: readonly string[]): string {
+  return `${PREFIX}${flightId}:${reservationKey(seatIds)}`;
 }
 
 function defaultStorage(): StorageLike | null {
@@ -77,13 +81,13 @@ function write(storage: StorageLike | null, key: string, value: StoredKey): void
 }
 
 export function bookingFingerprint(input: {
-  seatId: string;
+  seatIds: readonly string[];
   passengerName: string;
   passengerEmail: string;
   paymentMethod: string;
 }): string {
   return JSON.stringify({
-    seatId: input.seatId,
+    seatIds: [...input.seatIds].sort(),
     passengerName: input.passengerName.trim(),
     passengerEmail: input.passengerEmail.trim().toLowerCase(),
     paymentMethod: input.paymentMethod,
@@ -92,12 +96,12 @@ export function bookingFingerprint(input: {
 
 export function getOrCreateIdempotencyKey(
   flightId: string,
-  seatId: string,
+  seatIds: readonly string[],
   fingerprint: string,
   storage: StorageLike | null = defaultStorage(),
   generate: () => string = generateIdempotencyKey,
 ): string {
-  const key = storageKey(flightId, seatId);
+  const key = storageKey(flightId, seatIds);
   const stored = read(storage, key);
   if (stored && stored.fingerprint === fingerprint) {
     return stored.key;
@@ -110,12 +114,12 @@ export function getOrCreateIdempotencyKey(
 
 export function clearIdempotencyKey(
   flightId: string,
-  seatId: string,
+  seatIds: readonly string[],
   storage: StorageLike | null = defaultStorage(),
 ): void {
   if (!storage) return;
   try {
-    storage.removeItem(storageKey(flightId, seatId));
+    storage.removeItem(storageKey(flightId, seatIds));
   } catch {
     // Ignore storage failures.
   }

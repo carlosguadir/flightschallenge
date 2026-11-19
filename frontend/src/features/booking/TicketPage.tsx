@@ -98,8 +98,8 @@ export function TicketPage(): JSX.Element {
               <dd>{formatDateTime(ticket.departureAt)}</dd>
             </div>
             <div>
-              <dt>Seat</dt>
-              <dd>{ticket.seatLabel}</dd>
+              <dt>Seat{ticket.seats.length === 1 ? '' : 's'}</dt>
+              <dd>{ticket.seats.map((seat) => seat.seatLabel).join(', ')}</dd>
             </div>
             <div>
               <dt>Passenger</dt>

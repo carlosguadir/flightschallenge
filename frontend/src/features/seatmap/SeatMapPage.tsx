@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useRef, useState, type JSX } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { Seat } from '@flight/shared';
 
@@ -20,6 +20,7 @@ export function SeatMapPage(): JSX.Element {
   const [now, setNow] = useState(() => Date.now());
   const [pendingSeatId, setPendingSeatId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const lastExpiryRefresh = useRef<string | null>(null);
 
   const flightQuery = useQuery({
     queryKey: ['flight', flightId],
@@ -40,18 +41,25 @@ export function SeatMapPage(): JSX.Element {
   const availableSeats = live ? state.availableSeats : (flight?.availableSeats ?? 0);
   const currency = flight?.currency ?? 'USD';
 
-  const selectedSeat = state.selectedSeatId ? (state.seats[state.selectedSeatId] ?? null) : null;
-  const remainingSeconds =
-    selectedSeat?.expiresAt && selectedSeat.isMine
-      ? secondsRemaining(selectedSeat.expiresAt, state.serverOffsetMs, now)
-      : null;
+  const heldSeats = state.order
+    .map((seatId) => state.seats[seatId])
+    .filter((seat): seat is Seat => Boolean(seat && seat.status === 'HELD' && seat.isMine));
+  const earliestExpiry = heldSeats.reduce<string | null>((earliest, seat) => {
+    if (!seat.expiresAt) return earliest;
+    if (!earliest) return seat.expiresAt;
+    return seat.expiresAt < earliest ? seat.expiresAt : earliest;
+  }, null);
+  const remainingSeconds = earliestExpiry
+    ? secondsRemaining(earliestExpiry, state.serverOffsetMs, now)
+    : null;
 
   useEffect(() => {
-    if (live && selectedSeat?.isMine && remainingSeconds !== null && remainingSeconds <= 0) {
-      dispatch({ type: 'expireSelected' });
-      refresh();
-    }
-  }, [live, selectedSeat, remainingSeconds, dispatch, refresh]);
+    if (!live || !earliestExpiry || remainingSeconds === null || remainingSeconds > 0) return;
+    if (lastExpiryRefresh.current === earliestExpiry) return;
+
+    lastExpiryRefresh.current = earliestExpiry;
+    refresh();
+  }, [live, earliestExpiry, remainingSeconds, refresh]);
 
   if (!flightId) {
     return <p className="error-banner">Flight not found.</p>;
@@ -90,10 +98,9 @@ export function SeatMapPage(): JSX.Element {
     }
   };
 
-  const handleRelease = async (): Promise<void> => {
-    if (!selectedSeat) return;
-    await releaseSeat(flightId, selectedSeat.id);
-    dispatch({ type: 'releaseSucceeded', seatId: selectedSeat.id });
+  const handleRelease = async (seatId: string): Promise<void> => {
+    await releaseSeat(flightId, seatId);
+    dispatch({ type: 'releaseSucceeded', seatId });
   };
 
   const loading = !live && state.order.length === 0;
@@ -156,7 +163,7 @@ export function SeatMapPage(): JSX.Element {
 
           <CheckoutPanel
             flightId={flightId}
-            seat={selectedSeat}
+            seats={heldSeats}
             currency={currency}
             flightStatus={status}
             remainingSeconds={remainingSeconds}

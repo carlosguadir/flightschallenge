@@ -8,12 +8,12 @@ import { formatCountdown } from '../seatmap/countdown';
 
 interface CheckoutPanelProps {
   flightId: string;
-  seat: Seat | null;
+  seats: Seat[];
   currency: string;
   flightStatus: FlightStatus;
   remainingSeconds: number | null;
   expiringSoon: boolean;
-  onRelease: () => Promise<void>;
+  onRelease: (seatId: string) => Promise<void>;
   onBooked: (code: string) => void;
   refresh: () => void;
 }
@@ -25,13 +25,13 @@ function bookingErrorMessage(error: unknown): string {
 
   switch (error.code) {
     case 'PAYMENT_DECLINED':
-      return 'Payment declined. Your hold is still active; try again or switch method.';
+      return 'Payment declined. Your holds are still active; try again or switch method.';
     case 'IDEMPOTENCY_CONFLICT':
-      return 'This checkout was already used with different details. Refresh the seat and try again.';
+      return 'This checkout was already used with different details. Refresh the seats and try again.';
     case 'HOLD_EXPIRED':
-      return 'Your hold expired. Select the seat again.';
+      return 'At least one hold expired. Select the seats again.';
     case 'SEAT_UNAVAILABLE':
-      return 'That seat is no longer available. Refresh and pick another one.';
+      return 'At least one seat is no longer available. Refresh and pick seats again.';
     case 'FLIGHT_NOT_BOOKABLE':
       return 'This flight is no longer bookable.';
     default:
@@ -41,7 +41,7 @@ function bookingErrorMessage(error: unknown): string {
 
 export function CheckoutPanel({
   flightId,
-  seat,
+  seats,
   currency,
   flightStatus,
   remainingSeconds,
@@ -54,23 +54,31 @@ export function CheckoutPanel({
   const [email, setEmail] = useState('');
   const [method, setMethod] = useState<PaymentMethod>('TEST_OK');
   const [pending, setPending] = useState(false);
-  const [releasing, setReleasing] = useState(false);
+  const [releasingSeatId, setReleasingSeatId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const cancelled = flightStatus === 'CANCELLED';
-  const disabled = !seat || cancelled || pending || seat.status !== 'HELD' || !seat.isMine;
+  const heldSeats = seats.filter((seat) => seat.status === 'HELD' && seat.isMine);
+  const seatIds = heldSeats.map((seat) => seat.id).sort();
+  const totalCents = heldSeats.reduce((total, seat) => total + seat.priceCents, 0);
+  const disabled =
+    heldSeats.length === 0 ||
+    heldSeats.length !== seats.length ||
+    cancelled ||
+    pending ||
+    releasingSeatId !== null;
 
   const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
-    if (!seat || disabled) return;
+    if (disabled || seatIds.length === 0) return;
 
     const fingerprint = bookingFingerprint({
-      seatId: seat.id,
+      seatIds,
       passengerName: name,
       passengerEmail: email,
       paymentMethod: method,
     });
-    const idempotencyKey = getOrCreateIdempotencyKey(flightId, seat.id, fingerprint);
+    const idempotencyKey = getOrCreateIdempotencyKey(flightId, seatIds, fingerprint);
 
     setPending(true);
     setError(null);
@@ -79,13 +87,13 @@ export function CheckoutPanel({
       const booking = await confirmBooking(
         {
           flightId,
-          seatId: seat.id,
+          seatIds,
           passenger: { name: name.trim(), email: email.trim() },
           payment: { method },
         },
         idempotencyKey,
       );
-      clearIdempotencyKey(flightId, seat.id);
+      clearIdempotencyKey(flightId, seatIds);
       onBooked(booking.code);
     } catch (caught) {
       const message = bookingErrorMessage(caught);
@@ -95,7 +103,7 @@ export function CheckoutPanel({
         caught instanceof ApiError &&
         ['IDEMPOTENCY_CONFLICT', 'HOLD_EXPIRED', 'SEAT_UNAVAILABLE'].includes(caught.code)
       ) {
-        clearIdempotencyKey(flightId, seat.id);
+        clearIdempotencyKey(flightId, seatIds);
         refresh();
       }
     } finally {
@@ -103,16 +111,15 @@ export function CheckoutPanel({
     }
   };
 
-  const release = async (): Promise<void> => {
-    if (!seat) return;
-    setReleasing(true);
+  const release = async (seatId: string): Promise<void> => {
+    setReleasingSeatId(seatId);
     setError(null);
     try {
-      await onRelease();
+      await onRelease(seatId);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not release the seat');
     } finally {
-      setReleasing(false);
+      setReleasingSeatId(null);
     }
   };
 
@@ -120,38 +127,50 @@ export function CheckoutPanel({
     <aside className="card checkout" aria-label="Checkout">
       <h2>Checkout</h2>
 
-      {!seat ? (
+      {heldSeats.length === 0 ? (
         <p className="muted">
-          Select an available seat to hold it for a few minutes. Holds are released automatically
-          when the timer ends.
+          Select up to four available seats to hold them for a few minutes. Holds are released
+          automatically when the timer ends.
         </p>
       ) : (
         <>
           <div className="checkout-seat">
             <div>
-              <p className="muted">Selected seat</p>
-              <p className="checkout-seat-label">{seat.label}</p>
-              <p className="muted">
-                {seat.class === 'BUSINESS' ? 'Business' : 'Economy'} ·{' '}
-                {formatMoney(seat.priceCents, currency)}
+              <p className="muted">Reservation</p>
+              <p className="checkout-seat-label">
+                {heldSeats.length} seat{heldSeats.length === 1 ? '' : 's'}
               </p>
+              <p className="muted">{formatMoney(totalCents, currency)} total</p>
             </div>
             {remainingSeconds !== null ? (
               <div className={`countdown ${expiringSoon ? 'countdown-warning' : ''}`}>
-                <span className="muted">Hold expires in</span>
+                <span className="muted">Earliest hold expires in</span>
                 <strong>{formatCountdown(remainingSeconds)}</strong>
               </div>
             ) : null}
           </div>
 
-          <button
-            className="button button-ghost"
-            type="button"
-            onClick={() => void release()}
-            disabled={releasing || pending || cancelled}
-          >
-            {releasing ? 'Releasing…' : 'Release seat'}
-          </button>
+          <ul className="checkout-seats" aria-label="Held seats">
+            {heldSeats.map((seat) => (
+              <li className="checkout-seat-row" key={seat.id}>
+                <div>
+                  <strong>{seat.label}</strong>{' '}
+                  <span className="muted">
+                    {seat.class === 'BUSINESS' ? 'Business' : 'Economy'} ·{' '}
+                    {formatMoney(seat.priceCents, currency)}
+                  </span>
+                </div>
+                <button
+                  className="button button-ghost button-small"
+                  type="button"
+                  onClick={() => void release(seat.id)}
+                  disabled={pending || releasingSeatId !== null || cancelled}
+                >
+                  {releasingSeatId === seat.id ? 'Releasing…' : 'Release'}
+                </button>
+              </li>
+            ))}
+          </ul>
 
           {cancelled ? (
             <p className="notice notice-danger">
@@ -217,7 +236,9 @@ export function CheckoutPanel({
               disabled={disabled}
               data-testid="confirm-booking"
             >
-              {pending ? 'Confirming…' : 'Confirm booking'}
+              {pending
+                ? 'Confirming…'
+                : `Confirm booking (${heldSeats.length} seat${heldSeats.length === 1 ? '' : 's'})`}
             </button>
           </form>
         </>
