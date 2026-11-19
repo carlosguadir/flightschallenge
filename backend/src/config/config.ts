@@ -18,6 +18,7 @@ export interface AppConfig {
   logLevel: string;
   logPretty: boolean;
   appVersion: string;
+  testResetToken: string;
 }
 
 export const APP_CONFIG = Symbol('APP_CONFIG');
@@ -73,5 +74,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     logLevel: env.LOG_LEVEL ?? (nodeEnv === 'test' || nodeEnv === 'e2e' ? 'silent' : 'info'),
     logPretty: readBoolean(env.LOG_PRETTY, nodeEnv === 'development'),
     appVersion: env.APP_VERSION ?? 'dev',
+    testResetToken: env.TEST_RESET_TOKEN ?? '',
   };
 }

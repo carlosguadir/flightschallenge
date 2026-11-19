@@ -98,3 +98,40 @@ Pendiente de consolidar. La fase 3 fue corta porque los eventos ya se publicaban
 ### Impacto estimado
 
 Pendiente de consolidar. La fase 4 concentró el mayor volumen de código de UI; el reducer y los tests puros permitieron validar la sincronización sin depender de un navegador, y el smoke con CDP cubrió dos pestañas, booking y ticket reales.
+
+## Fase 5 — Playwright, documentación y CI
+
+### Prompts y casos de uso
+
+- **Prompt:** «proceed with next phase».
+- **Resultado:** workspace `@flight/e2e` con Playwright 1.65.1 y axe-core, cinco pruebas E2E con contextos aislados y reset determinista, hook `POST /api/test/reset` limitado a `test|e2e` + token, perfil de compose `e2e` aislado en el proyecto `flight-e2e`, `docs/architecture.md`, `docs/operations.md`, este consolidado y `.github/workflows/ci.yml` con `preflight`, `quality`, `integration`, `e2e` y `secrets`.
+
+### Casos en los que la IA se equivocó y cómo se corrigió
+
+- **`crypto.randomUUID` en un origen no seguro.** La prueba E2E-2 falló porque el checkout generaba la idempotency key con `crypto.randomUUID()`, disponible solo en contextos seguros. En el contenedor el origen es `http://frontend`, no `localhost`, así que la función no existía y el submit lanzaba `TypeError`. Se añadió un generador de UUIDv4 con `crypto.getRandomValues` como fallback (y `Math.random` como último recurso), más un test unitario que fuerza el camino sin `randomUUID`. Es el tipo de bug que el smoke manual en `localhost` no detecta.
+- **Permisos de `test-results` en la imagen de Playwright.** El `COPY e2e/package.json e2e/` creaba `/app/e2e` como root antes del `COPY --chown`; el runner seguía sin poder crear `test-results`. Se añadió `mkdir` + `chown -R pwuser:pwuser /app/e2e` después del copy.
+- **Contenedor viejo reutilizado por podman-compose.** Tras reconstruir la imagen, `up` reutilizó el contenedor anterior y el error de permisos persistió. Se incorporó `--force-recreate` al target `make test-e2e` y al job de CI.
+- **TTL corto y tiempos de UI.** El perfil e2e usa 5s para probar la expiración; la primera ejecución de booking no cabía en esa ventana por el fallo de `randomUUID`, no por el TTL. Se mantuvo el valor del plan y se corrigió la causa real en lugar de alargar el TTL.
+- **CI sin Podman 5.x garantizado.** El runner de Ubuntu trae una versión anterior a 5.x; se fijó `podman-compose==1.5.0` y se dejó una comprobación explícita (`podman info`, `podman compose version`), documentando que el runtime objetivo del entregable sigue siendo Podman 5.7.
+- **Override de desarrollo con pod y `keep-id`.** `podman-compose` crea un pod por defecto, y Podman rechaza `--userns` junto con `--pod`; el arranque dev fallaba con `--userns and --pod cannot be set together`. Se añadió `--in-pod=false` al target `make dev`, al README y a la guía de operaciones, y se validó el arranque con health directo y proxy de Vite.
+
+### Impacto consolidado
+
+Estimaciones aproximadas por área, sin cronómetro; el KATA premia la honestidad sobre la cifra:
+
+| Área                                                                   | Ahorro estimado | Tiempo invertido en corregir/ajustar | Comentario                                                                                       |
+| ---------------------------------------------------------------------- | --------------: | -----------------------------------: | ------------------------------------------------------------------------------------------------ |
+| Planificación, revisión del plan y ADR                                 |           1.5 h |                                1.0 h | Reconstrucción del Markdown, Podman, alcance de cancelación, recorte a `PLAN_APPENDIX.md`        |
+| Scaffolding (workspaces, Nest, Vite, Zod/tsup, Vitest, Containerfiles) |           2.5 h |                                0.5 h | El boilerplate salió casi directo; ajustes de `tsconfig`, `LOG_PRETTY`, Vitest 3 y `tsup`        |
+| Núcleo de consistencia (holds, lock, sweeper, booking, idempotencia)   |           1.0 h |                                1.5 h | Los bugs de hold en una sentencia, lock faltante, orden de idempotencia y savepoint de código    |
+| Tiempo real (gateway, rooms, versiones, métricas)                      |           1.0 h |                                0.5 h | Inicialización del publisher/gateway, batching y test de dos clientes                            |
+| Frontend (rutas, reducer, checkout, a11y)                              |           1.5 h |                                1.0 h | Selección tras expiración, selector ambiguo, `randomUUID` fuera de contexto seguro               |
+| Tests (integración, E2E, CI)                                           |           1.5 h |                                1.5 h | Imagen de Playwright, contenedores cacheados, puertos, dependencias                              |
+| Documentación (README, arquitectura, operaciones, bitácora)            |           1.0 h |                                0.5 h | El contenido se pudo estructurar rápido; la consolidación exigió releer las fases                |
+| **Total**                                                              |    **≈ 10.0 h** |                          **≈ 6.5 h** | **Ahorro neto ≈ 3.5 h**, con la mayor parte del costo en concurrencia, contenedores y validación |
+
+Conclusión honesta: la IA aceleró sobre todo el andamiaje, los contratos, los tests puros y la
+documentación; el tiempo se fue en los detalles que deciden la corrección —serialización,
+idempotencia, orden de eventos y diferencias entre el host y el contenedor—. El caso de
+`crypto.randomUUID` muestra por qué la suite E2E y los tests contra Postgres real no son
+decoración: detectaron fallos que el smoke en `localhost` no reproducía.

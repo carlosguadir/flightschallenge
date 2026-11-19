@@ -1,0 +1,19 @@
+FROM mcr.microsoft.com/playwright:v1.65.1-noble
+
+USER root
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY shared/package.json shared/
+COPY backend/package.json backend/
+COPY frontend/package.json frontend/
+COPY e2e/package.json e2e/
+RUN npm ci --workspace @flight/e2e --include-workspace-root
+
+COPY --chown=pwuser:pwuser e2e e2e
+RUN mkdir -p /app/e2e/test-results && chown -R pwuser:pwuser /app/e2e
+
+USER pwuser
+WORKDIR /app/e2e
+
+CMD ["npx", "playwright", "test"]

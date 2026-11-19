@@ -1,3 +1,5 @@
+# Run with: podman compose --in-pod=false -f compose.yaml -f compose.dev.yaml up
+# podman-compose creates a pod by default; userns_mode keep-id cannot be combined with it.
 services:
   backend:
     build:

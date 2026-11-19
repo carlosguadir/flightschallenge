@@ -50,6 +50,7 @@ export default tseslint.config(
         { type: 'backend-core', pattern: 'backend/src/**' },
         { type: 'frontend', pattern: 'frontend/src/**' },
         { type: 'tests', pattern: 'backend/test/**' },
+        { type: 'e2e', pattern: 'e2e/**' },
       ],
     },
     rules: {
@@ -80,6 +81,10 @@ export default tseslint.config(
               from: 'frontend',
               disallow: [...BACKEND_LAYERS, 'tests'],
             },
+            {
+              from: 'e2e',
+              disallow: [...BACKEND_LAYERS, 'frontend', 'tests'],
+            },
           ],
         },
       ],
@@ -91,6 +96,7 @@ export default tseslint.config(
       'backend/test/**/*.ts',
       'shared/src/**/*.ts',
       'frontend/src/**/*.{ts,tsx}',
+      'e2e/**/*.ts',
     ],
     extends: [tseslint.configs.recommendedTypeChecked],
     rules: {

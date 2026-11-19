@@ -6,7 +6,8 @@
   "workspaces": [
     "shared",
     "backend",
-    "frontend"
+    "frontend",
+    "e2e"
   ],
   "engines": {
     "node": ">=22"
@@ -21,6 +22,7 @@
     "format:check": "prettier --check .",
     "test:unit": "npm run build --workspace @flight/shared && npm run test:unit --workspace @flight/backend && npm run test:unit --workspace @flight/frontend",
     "test:integration": "npm run build --workspace @flight/shared && npm run test:integration --workspace @flight/backend",
+    "test:e2e": "npm run test --workspace @flight/e2e",
     "quality": "npm run lint && npm run typecheck && npm run format:check && npm run test:unit"
   },
   "devDependencies": {

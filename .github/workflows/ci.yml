@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Podman and podman-compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends podman pipx
+          pipx install podman-compose==1.5.0
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Prepare rootless Podman
+        run: |
+          sudo mkdir -p "/run/user/$(id -u)"
+          sudo chown "$(id -u):$(id -g)" "/run/user/$(id -u)"
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> "$GITHUB_ENV"
+      - name: Podman smoke check
+        run: |
+          podman --version
+          podman info
+          podman compose version
+
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run quality
+
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: preflight
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Podman and podman-compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends podman pipx
+          pipx install podman-compose==1.5.0
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Prepare rootless Podman
+        run: |
+          sudo mkdir -p "/run/user/$(id -u)"
+          sudo chown "$(id -u):$(id -g)" "/run/user/$(id -u)"
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> "$GITHUB_ENV"
+      - name: Build the test image
+        run: podman compose -f compose.yaml --profile test build tests
+      - name: Run integration suite against app_test
+        run: podman compose -f compose.yaml --profile test run --rm tests
+      - name: Tear down
+        if: always()
+        run: podman compose -f compose.yaml --profile test down -v || true
+
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: preflight
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Podman and podman-compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends podman pipx
+          pipx install podman-compose==1.5.0
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Prepare rootless Podman
+        run: |
+          sudo mkdir -p "/run/user/$(id -u)"
+          sudo chown "$(id -u):$(id -g)" "/run/user/$(id -u)"
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> "$GITHUB_ENV"
+      - name: Run Playwright suite
+        run: |
+          podman compose --env-file .env.e2e -f compose.yaml -p flight-e2e --profile e2e \
+            up --build --force-recreate --abort-on-container-exit --exit-code-from e2e
+      - name: Collect Playwright artifacts
+        if: failure()
+        run: podman cp flight-e2e_e2e_1:/app/e2e/test-results ./test-results || true
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-artifacts
+          path: test-results
+          if-no-files-found: ignore
+      - name: Tear down
+        if: always()
+        run: |
+          podman compose --env-file .env.e2e -f compose.yaml -p flight-e2e --profile e2e down -v || true
+
+  secrets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -21,25 +21,26 @@ services:
       dockerfile: backend/Containerfile
       target: runtime
     environment:
-      NODE_ENV: development
+      NODE_ENV: ${BACKEND_NODE_ENV:-development}
       PORT: '3000'
       DATABASE_URL: postgres://flight:flight@db:5432/flight
       COOKIE_SECRET: local-cookie-secret-change-me
       COOKIE_SECURE: 'false'
       TRUST_PROXY: '1'
-      SEAT_HOLD_TTL_SECONDS: '300'
+      SEAT_HOLD_TTL_SECONDS: ${SEAT_HOLD_TTL_SECONDS:-300}
       MAX_HOLDS_PER_FLIGHT: '4'
-      PAYMENT_DELAY_MS: '300'
-      PG_POOL_MAX: '20'
+      PAYMENT_DELAY_MS: ${PAYMENT_DELAY_MS:-300}
+      PG_POOL_MAX: ${PG_POOL_MAX:-20}
       LOCK_TIMEOUT_MS: '2000'
       STATEMENT_TIMEOUT_MS: '10000'
-      THROTTLE_ENABLED: 'true'
+      THROTTLE_ENABLED: ${THROTTLE_ENABLED:-true}
       THROTTLE_LIMIT: '100'
       THROTTLE_TTL_SECONDS: '60'
-      METRICS_BATCH_MS: '75'
-      LOG_LEVEL: info
+      METRICS_BATCH_MS: ${METRICS_BATCH_MS:-75}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_PRETTY: 'false'
       APP_VERSION: dev
+      TEST_RESET_TOKEN: ${TEST_RESET_TOKEN:-}
     depends_on:
       db:
         condition: service_healthy
@@ -63,10 +64,31 @@ services:
       dockerfile: frontend/Containerfile
       target: runtime
     ports:
-      - '8080:80'
+      - '${FRONTEND_PORT:-8080}:80'
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1/ || exit 1']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  e2e:
+    profiles: ['e2e']
+    build:
+      context: .
+      dockerfile: e2e/Containerfile
+    environment:
+      PLAYWRIGHT_BASE_URL: http://frontend
+      TEST_RESET_TOKEN: ${TEST_RESET_TOKEN:-}
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    shm_size: '1g'
 
   tests:
     profiles: ['test']

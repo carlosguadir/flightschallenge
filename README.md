@@ -2,7 +2,7 @@
 
 Sistema de reserva de vuelos con holds temporales, booking y actualizaciones en tiempo real. Monolito modular NestJS + React, PostgreSQL 16 y Podman Compose.
 
-**Estado actual: fase 4 (frontend completo).** Ya funcionan búsqueda/detalle de vuelos, snapshot del seat map, holds idempotentes con máximo 4 por sesión y vuelo, release, expiración por sweeper + lazy expiry, guards de estado, booking con pago simulado, idempotencia y lookup, gateway Socket.io con rooms y join ack, métricas batched, transiciones administrativas y las cuatro rutas de React con sincronización en vivo, reconnect buffer y checkout accesible. La suite Playwright y el cierre de docs/CI llegan en la fase 5.
+**Estado actual: fase 5 (entrega completa).** Funcionan búsqueda/detalle de vuelos, snapshot del seat map, holds idempotentes con máximo 4 por sesión y vuelo, release, expiración por sweeper + lazy expiry, guards de estado, booking con pago simulado, idempotencia y lookup, gateway Socket.io con rooms y join ack, métricas batched, transiciones administrativas y las cuatro rutas de React con sincronización en vivo, reconnect buffer y checkout accesible. La suite Playwright, la documentación de arquitectura/operaciones y el workflow de CI están incluidos.
 
 ### Rutas del frontend
 
@@ -17,18 +17,19 @@ El seat map mantiene un buffer de eventos hasta recibir el ack de `flight.join` 
 
 ### Endpoints disponibles
 
-| Método | Ruta                                      | Descripción                                                |
-| ------ | ----------------------------------------- | ---------------------------------------------------------- |
-| GET    | `/api/health`                             | Healthcheck con ping a la base                             |
-| GET    | `/api/flights?origin=&destination=&date=` | Búsqueda (fecha UTC `YYYY-MM-DD`)                          |
-| GET    | `/api/flights/:id`                        | Detalle del vuelo                                          |
-| GET    | `/api/flights/:id/seats`                  | Snapshot del seat map + `serverTime` + versión             |
-| GET    | `/api/flights/:id/metrics`                | Contadores y ocupación del dashboard                       |
-| POST   | `/api/flights/:id/seats/:seatId/hold`     | Hold idempotente (máx. 4 por sesión/vuelo)                 |
-| DELETE | `/api/flights/:id/seats/:seatId/hold`     | Release del hold propio                                    |
-| POST   | `/api/bookings`                           | Booking con `Idempotency-Key` y pago fake                  |
-| POST   | `/api/bookings/lookup`                    | Ticket por `{code, email}` (rate limited, sin enumeración) |
-| PATCH  | `/api/admin/flights/:id/status`           | Cambiar estado (`SCHEDULED`/`DELAYED`/`CANCELLED`)         |
+| Método | Ruta                                      | Descripción                                                 |
+| ------ | ----------------------------------------- | ----------------------------------------------------------- |
+| GET    | `/api/health`                             | Healthcheck con ping a la base                              |
+| GET    | `/api/flights?origin=&destination=&date=` | Búsqueda (fecha UTC `YYYY-MM-DD`)                           |
+| GET    | `/api/flights/:id`                        | Detalle del vuelo                                           |
+| GET    | `/api/flights/:id/seats`                  | Snapshot del seat map + `serverTime` + versión              |
+| GET    | `/api/flights/:id/metrics`                | Contadores y ocupación del dashboard                        |
+| POST   | `/api/flights/:id/seats/:seatId/hold`     | Hold idempotente (máx. 4 por sesión/vuelo)                  |
+| DELETE | `/api/flights/:id/seats/:seatId/hold`     | Release del hold propio                                     |
+| POST   | `/api/bookings`                           | Booking con `Idempotency-Key` y pago fake                   |
+| POST   | `/api/bookings/lookup`                    | Ticket por `{code, email}` (rate limited, sin enumeración)  |
+| PATCH  | `/api/admin/flights/:id/status`           | Cambiar estado (`SCHEDULED`/`DELAYED`/`CANCELLED`)          |
+| POST   | `/api/test/reset`                         | Solo `NODE_ENV=test\|e2e` + `x-test-reset-token`; resiembra |
 
 `POST /api/bookings` acepta `payment.method` como `TEST_OK` o `TEST_DECLINE`; no recibe datos de tarjeta. La primera confirmación devuelve `201` y los replays idempotentes `200`.
 
@@ -57,8 +58,11 @@ El backend espera el healthcheck de Postgres, aplica migraciones y seed idempote
 ### Desarrollo con hot reload
 
 ```bash
-podman compose -f compose.yaml -f compose.dev.yaml up
+podman compose --in-pod=false -f compose.yaml -f compose.dev.yaml up
 ```
+
+`--in-pod=false` es necesario: `podman-compose` crea un pod por defecto y `userns_mode: keep-id`
+no puede combinarse con un pod.
 
 - Vite: http://localhost:5173
 - API directa: http://localhost:3000
@@ -70,12 +74,19 @@ podman compose -f compose.yaml -f compose.dev.yaml up
 podman compose -f compose.yaml --profile test run --rm tests npm run test:unit
 
 # Integración (Postgres real, base app_test, serial)
+podman compose -f compose.yaml --profile test build tests
 podman compose -f compose.yaml --profile test run --rm tests
+
+# E2E Playwright (5 tests, contexto aislado, axe incluido)
+make test-e2e
 ```
 
-La imagen `test` incluye dependencias de desarrollo y ejecuta `test:integration` por defecto.
+La imagen `test` incluye dependencias de desarrollo y ejecuta `test:integration` por defecto. El
+perfil `e2e` vive en el proyecto `flight-e2e`, usa `NODE_ENV=e2e`, TTL de 5s y publica el frontend
+en `8081` para no chocar con el stack de desarrollo. Los comandos completos y el troubleshooting
+están en [docs/operations.md](docs/operations.md).
 
-## Smoke test del hold (fase 0)
+## Smoke test manual del hold
 
 Obtener un vuelo y asiento del seed:
 
@@ -108,20 +119,34 @@ npm run format:check
 npm run test:unit
 ```
 
-- 22 tests unitarios (10 backend + 12 frontend): reducer versionado, reconnect buffer, countdown, idempotencia, guards, UoW y redacción de logs.
-- 39 tests de integración en el perfil `test` de Podman.
-- Axe sin violaciones en las cuatro rutas (auditoría WCAG 2.1 AA).
+- 23 tests unitarios (10 backend + 13 frontend): reducer versionado, reconnect buffer, countdown, idempotencia —incluido el fallback de UUID fuera de contexto seguro—, guards, UoW y redacción de logs.
+- 41 tests de integración en el perfil `test` de Podman, contra Postgres real (`app_test`).
+- 5 tests E2E Playwright con dos contextos, expiración real y axe sin violaciones WCAG 2.1 AA.
 
-- ESLint 9 flat config: `typescript-eslint` type-aware, React Hooks/Refresh y `eslint-plugin-boundaries` (prohíbe que `application` importe `infrastructure` y que `shared`/`frontend` importen backend).
+- ESLint 9 flat config: `typescript-eslint` type-aware, React Hooks/Refresh y `eslint-plugin-boundaries` (prohíbe que `application` importe `infrastructure`, que `shared`/`frontend` importen backend y que `e2e` importe internals).
 - Prettier 3.
-- Vitest: unitarios en paralelo; integración serial contra `app_test`.
+- Vitest: unitarios en paralelo; integración serial contra `app_test`; Playwright `workers: 1`, contextos nuevos y reset por test.
+- CI (`.github/workflows/ci.yml`): `preflight`, `quality`, `integration`, `e2e` y `secrets` con Podman rootless y `podman-compose==1.5.0`; sin Docker.
 
 ## Variables de entorno
 
-Ver [.env.example](.env.example). Las principales: `DATABASE_URL`, `COOKIE_SECRET`, `COOKIE_SECURE`, `TRUST_PROXY`, `SEAT_HOLD_TTL_SECONDS`, `MAX_HOLDS_PER_FLIGHT`, `THROTTLE_ENABLED`, `PG_POOL_MAX`, `LOCK_TIMEOUT_MS`, `STATEMENT_TIMEOUT_MS`.
+Ver [.env.example](.env.example). Las principales: `DATABASE_URL`, `COOKIE_SECRET`, `COOKIE_SECURE`, `TRUST_PROXY`, `SEAT_HOLD_TTL_SECONDS`, `MAX_HOLDS_PER_FLIGHT`, `THROTTLE_ENABLED`, `PG_POOL_MAX`, `LOCK_TIMEOUT_MS`, `STATEMENT_TIMEOUT_MS`, `TEST_RESET_TOKEN` (solo `test|e2e`).
 
 ## Documentación
 
 - [PLAN.md](PLAN.md) — plan y arquitectura.
 - [PLAN_APPENDIX.md](PLAN_APPENDIX.md) — defensa, producción y guías de docs.
-- [docs/ia.md](docs/ia.md) — bitácora de uso de IA (se actualiza por fase).
+- [docs/architecture.md](docs/architecture.md) — decisiones, SQL de concurrencia, realtime, testing y modos de fallo.
+- [docs/operations.md](docs/operations.md) — arranque, reset, perfiles, variables y troubleshooting.
+- [docs/ia.md](docs/ia.md) — bitácora de uso de IA y consolidado de impacto por fase.
+
+## Fases
+
+| Fase | Commit                                                           | Alcance                                |
+| ---- | ---------------------------------------------------------------- | -------------------------------------- |
+| 0    | `chore: scaffold workspace, podman compose and test harness`     | Workspaces, contratos, Podman, harness |
+| 1    | `feat: seat hold lifecycle, search and per-flight serialization` | Holds, sweeper, búsqueda               |
+| 2    | `feat: booking, fake payment and idempotency`                    | Booking, pago fake, lookup             |
+| 3    | `feat: realtime gateway with join ack and versioned events`      | Socket.io, métricas, admin             |
+| 4    | `feat: search, seat map, checkout, ticket and live dashboard`    | Frontend completo                      |
+| 5    | `test: playwright e2e, docs and ci`                              | E2E, arquitectura, operaciones, CI     |

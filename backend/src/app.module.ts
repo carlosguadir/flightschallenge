@@ -16,6 +16,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { SharedKernelModule } from './shared-kernel/shared-kernel.module';
+import { TestingModule } from './testing/testing.module';
 
 @Module({})
 export class AppModule {
@@ -25,6 +26,9 @@ export class AppModule {
     if (config.throttleEnabled) {
       providers.push({ provide: APP_GUARD, useClass: ThrottlerGuard });
     }
+
+    const testingModules =
+      config.nodeEnv === 'test' || config.nodeEnv === 'e2e' ? [TestingModule] : [];
 
     return {
       module: AppModule,
@@ -47,6 +51,7 @@ export class AppModule {
         PaymentsModule,
         InsightsModule,
         NotificationsModule,
+        ...testingModules,
       ],
       providers,
     };

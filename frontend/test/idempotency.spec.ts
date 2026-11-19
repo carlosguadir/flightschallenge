@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   bookingFingerprint,
   clearIdempotencyKey,
+  generateIdempotencyKey,
   getOrCreateIdempotencyKey,
   type StorageLike,
 } from '../src/features/checkout/idempotency';
@@ -24,6 +25,10 @@ class MemoryStorage implements StorageLike {
 }
 
 describe('booking idempotency key lifecycle', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('reuses a key for the same payload and rotates when the payload changes', () => {
     const storage = new MemoryStorage();
     let counter = 0;
@@ -66,6 +71,18 @@ describe('booking idempotency key lifecycle', () => {
     clearIdempotencyKey(flightId, seatId, storage);
     const second = getOrCreateIdempotencyKey(flightId, seatId, fingerprint, storage, () => 'key-2');
     expect(second).toBe('key-2');
+  });
+
+  it('generates a UUID v4 without relying on the secure-context randomUUID', () => {
+    vi.stubGlobal('crypto', {
+      getRandomValues: (bytes: Uint8Array) => {
+        bytes.fill(0xab);
+        return bytes;
+      },
+    });
+
+    const key = generateIdempotencyKey();
+    expect(key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 
   it('normalizes passenger data in the fingerprint', () => {

@@ -11,6 +11,35 @@ interface StoredKey {
 
 const PREFIX = 'flight-booking:idempotency:';
 
+/**
+ * `crypto.randomUUID` is restricted to secure contexts, so it is missing when
+ * the app is served over plain HTTP under a non-localhost hostname (for
+ * example the Playwright container talking to nginx). `getRandomValues` has no
+ * such restriction; Math.random is only the last-resort fallback.
+ */
+export function generateIdempotencyKey(): string {
+  const cryptoApi = typeof globalThis.crypto === 'undefined' ? undefined : globalThis.crypto;
+
+  if (typeof cryptoApi?.randomUUID === 'function') {
+    return cryptoApi.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  if (typeof cryptoApi?.getRandomValues === 'function') {
+    cryptoApi.getRandomValues(bytes);
+  } else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 function storageKey(flightId: string, seatId: string): string {
   return `${PREFIX}${flightId}:${seatId}`;
 }
@@ -66,7 +95,7 @@ export function getOrCreateIdempotencyKey(
   seatId: string,
   fingerprint: string,
   storage: StorageLike | null = defaultStorage(),
-  generate: () => string = () => crypto.randomUUID(),
+  generate: () => string = generateIdempotencyKey,
 ): string {
   const key = storageKey(flightId, seatId);
   const stored = read(storage, key);

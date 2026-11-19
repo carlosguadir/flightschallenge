@@ -128,19 +128,27 @@ export function DashboardPage(): JSX.Element {
       <div className="metrics-grid">
         <article className="card metric-card">
           <p className="metric-label">Available</p>
-          <p className="metric-value">{metrics?.available ?? '—'}</p>
+          <p className="metric-value" data-testid="metric-available">
+            {metrics?.available ?? '—'}
+          </p>
         </article>
         <article className="card metric-card">
           <p className="metric-label">Held</p>
-          <p className="metric-value">{metrics?.held ?? '—'}</p>
+          <p className="metric-value" data-testid="metric-held">
+            {metrics?.held ?? '—'}
+          </p>
         </article>
         <article className="card metric-card">
           <p className="metric-label">Booked</p>
-          <p className="metric-value">{metrics?.booked ?? '—'}</p>
+          <p className="metric-value" data-testid="metric-booked">
+            {metrics?.booked ?? '—'}
+          </p>
         </article>
         <article className="card metric-card">
           <p className="metric-label">Total</p>
-          <p className="metric-value">{metrics?.total ?? '—'}</p>
+          <p className="metric-value" data-testid="metric-total">
+            {metrics?.total ?? '—'}
+          </p>
         </article>
       </div>
 
