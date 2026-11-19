@@ -64,6 +64,10 @@ export async function waitForLive(page: Page): Promise<void> {
   await expect(page.locator('.connection-live')).toHaveText('Live');
 }
 
+export async function waitForSearchReady(page: Page): Promise<void> {
+  await expect(page.getByTestId('search-page')).toHaveAttribute('data-search-ready', 'true');
+}
+
 export function metricValue(page: Page, name: 'available' | 'held' | 'booked' | 'total'): Locator {
   return page.getByTestId(`metric-${name}`);
 }

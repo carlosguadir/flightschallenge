@@ -11,6 +11,7 @@ import {
   openSeatMap,
   resetData,
   waitForLive,
+  waitForSearchReady,
 } from './helpers';
 
 test.beforeEach(async ({ request }) => {
@@ -99,6 +100,7 @@ test('E2E-3: an admin status change reaches the search list and disables a cance
 
   await pageB.goto('/');
   await waitForLive(pageB);
+  await waitForSearchReady(pageB);
 
   const card = pageB.getByTestId(`flight-${flight.id}`);
   await expect(card).toBeVisible();

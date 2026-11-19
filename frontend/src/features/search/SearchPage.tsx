@@ -6,7 +6,7 @@ import type { FlightSummary, FlightUpdatedEvent } from '@flight/shared';
 import { FlightBadges } from '../../components/Badges';
 import { getFlights } from '../../lib/api';
 import { formatDate, formatMoney, formatTime } from '../../lib/format';
-import { onServerEvent } from '../../lib/socket-context';
+import { emitWithAck, onServerEvent } from '../../lib/socket-context';
 import { useSocket } from '../../lib/useSocket';
 
 interface Filters {
@@ -20,6 +20,7 @@ const EMPTY_FILTERS: Filters = { origin: '', destination: '', date: '' };
 export function SearchPage(): JSX.Element {
   const [form, setForm] = useState<Filters>(EMPTY_FILTERS);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [searchReady, setSearchReady] = useState(false);
   const queryClient = useQueryClient();
   const { socket, connected } = useSocket();
   const flights = useQuery({
@@ -28,9 +29,19 @@ export function SearchPage(): JSX.Element {
   });
 
   useEffect(() => {
-    if (!socket || !connected) return;
+    if (!socket || !connected) {
+      setSearchReady(false);
+      return;
+    }
 
-    socket.emit('search.join', {});
+    let active = true;
+    setSearchReady(false);
+    void emitWithAck(socket, 'search.join', {})
+      .then(() => {
+        if (active) setSearchReady(true);
+      })
+      .catch(() => undefined);
+
     const off = onServerEvent<FlightUpdatedEvent>(socket, 'flight.updated', (event) => {
       queryClient.setQueryData<FlightSummary[]>(['flights', filters], (current) =>
         current?.map((flight) =>
@@ -60,7 +71,10 @@ export function SearchPage(): JSX.Element {
       );
     });
 
-    return off;
+    return () => {
+      active = false;
+      off();
+    };
   }, [socket, connected, filters, queryClient]);
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
@@ -80,7 +94,11 @@ export function SearchPage(): JSX.Element {
   const results = flights.data ?? [];
 
   return (
-    <section className="page" data-testid="search-page">
+    <section
+      className="page"
+      data-testid="search-page"
+      data-search-ready={searchReady ? 'true' : 'false'}
+    >
       <header className="page-heading">
         <p className="eyebrow">US1 · Search</p>
         <h1>Find your next flight</h1>
