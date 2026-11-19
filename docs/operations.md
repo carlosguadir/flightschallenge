@@ -28,7 +28,7 @@ podman compose -f compose.yaml up --build
 - Logs: `podman compose -f compose.yaml logs -f backend`
 
 El backend espera el healthcheck de Postgres, aplica migraciones y seed idempotente, y escucha en
-el puerto 3000. nginx sirve el frontend y proxya `/api` y `/socket.io`; no hay CORS.
+el puerto 3000. nginx sirve el frontend y proxya `/api` y `/realtime`; no hay CORS.
 
 Para desarrollo con hot reload:
 
@@ -68,7 +68,7 @@ y se usa solo desde Playwright.
 # Unitarios (sin DB): 23 tests
 podman compose -f compose.yaml --profile test run --rm tests npm run test:unit
 
-# Integración (Postgres real, base app_test, serial): 42 tests
+# Integración (Postgres real, base app_test, serial): 45 tests
 podman compose -f compose.yaml --profile test build tests
 podman compose -f compose.yaml --profile test run --rm tests
 
@@ -114,6 +114,7 @@ podman compose --env-file .env.e2e -f compose.yaml -p flight-e2e --profile e2e d
 | `THROTTLE_ENABLED`      |                                    `true` |        `false` |           `false` | Rate limiting                                 |
 | `METRICS_BATCH_MS`      |                                      `75` |           `25` |              `25` | Ventana de `flight.metrics`                   |
 | `TEST_RESET_TOKEN`      |                                     vacío |              — | `e2e-reset-token` | Hook de reset                                 |
+| `SWAGGER_ENABLED`       |                      `true` fuera de prod |         `true` |            `true` | Swagger UI/OpenAPI                            |
 | `FRONTEND_PORT`         |                                    `8080` |              — |            `8081` | Puerto publicado                              |
 
 `.env.example` lista todas las variables; `.env.e2e` contiene los valores del perfil Playwright
@@ -128,6 +129,8 @@ podman compose --env-file .env.e2e -f compose.yaml -p flight-e2e --profile e2e d
 - Health: `GET /api/health` (ping a la DB y gateway Socket.io inicializado; 503 si falta
   cualquiera). No abre una conexión de socket sintética: la aceptación real se cubre en los tests
   de integración y E2E.
+- API docs: Swagger UI en `/api/docs` y OpenAPI JSON en `/api/docs-json`; deshabilitado en
+  producción por defecto (`SWAGGER_ENABLED`).
 - El dashboard muestra la versión del vuelo, contadores, ocupación y feed de actividad.
 
 ## CI
@@ -148,7 +151,7 @@ sigue siendo Podman 5.7 + podman-compose 1.5.
 | El puerto 8081 está ocupado en e2e             | Stack de desarrollo u otro e2e    | Cambiar `FRONTEND_PORT` en `.env.e2e`                                   |
 | SELinux bloquea bind mounts                    | Contexto incorrecto               | Los overrides usan `:Z`; verificar que se aplique el override           |
 | `podman compose` no existe                     | Provider no instalado             | Instalar `podman-compose==1.5.0` (pipx)                                 |
-| WebSocket no conecta detrás de un proxy        | Upgrade no proxificado            | Mantener los headers de `/socket.io` como en `frontend/nginx.conf`      |
+| WebSocket no conecta detrás de un proxy        | Upgrade no proxificado            | Mantener los headers de `/realtime` como en `frontend/nginx.conf`       |
 
 ## Límites operativos
 

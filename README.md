@@ -1,8 +1,8 @@
-# Flight Booking Challenge
+# Flight Booking
 
 Sistema de reserva de vuelos con holds temporales, booking y actualizaciones en tiempo real. Monolito modular NestJS + React, PostgreSQL 16 y Podman Compose.
 
-**Estado actual: fase 5 (entrega completa).** Funcionan búsqueda/detalle de vuelos, snapshot del seat map, holds idempotentes con máximo 4 por sesión y vuelo, release, expiración por sweeper + lazy expiry, guards de estado, booking con pago simulado, idempotencia y lookup, gateway Socket.io con rooms y join ack, métricas batched, transiciones administrativas y las cuatro rutas de React con sincronización en vivo, reconnect buffer y checkout accesible. La suite Playwright, la documentación de arquitectura/operaciones y el workflow de CI están incluidos.
+> Instalar podman and podman compose para ejecutar este proyecto en su maquina local.
 
 ### Rutas del frontend
 
@@ -33,9 +33,16 @@ El seat map mantiene un buffer de eventos hasta recibir el ack de `flight.join` 
 
 `POST /api/bookings` acepta `payment.method` como `TEST_OK` o `TEST_DECLINE`; no recibe datos de tarjeta. La primera confirmación devuelve `201` y los replays idempotentes `200`.
 
+### API docs
+
+- Swagger UI: http://localhost:8080/api/docs
+- OpenAPI JSON: http://localhost:8080/api/docs-json
+- Habilitado por defecto fuera de producción; `SWAGGER_ENABLED=false` lo desactiva. Los schemas
+  se generan desde los contratos Zod de `@flight/shared`.
+
 ### Realtime
 
-Socket.io en `/socket.io`, autenticado con la misma cookie firmada. Cliente → servidor: `flight.join` (ack), `flight.leave`, `search.join`. Servidor → cliente: `flight.updated`, `seat.held`, `seat.released`, `seat.booked` y `flight.metrics` (batched, `METRICS_BATCH_MS`).
+Socket.io en `/realtime`, autenticado con la misma cookie firmada. Cliente → servidor: `flight.join` (ack), `flight.leave`, `search.join`. Servidor → cliente: `flight.updated`, `seat.held`, `seat.released`, `seat.booked` y `flight.metrics` (batched, `METRICS_BATCH_MS`).
 
 ## Stack
 
@@ -53,7 +60,7 @@ podman compose -f compose.yaml up --build
 - App: http://localhost:8080
 - Health: http://localhost:8080/api/health
 
-El backend espera el healthcheck de Postgres, aplica migraciones y seed idempotente, y arranca en el puerto 3000; nginx sirve el frontend y hace proxy de `/api` y `/socket.io` al backend.
+El backend espera el healthcheck de Postgres, aplica migraciones y seed idempotente, y arranca en el puerto 3000; nginx sirve el frontend y hace proxy de `/api` y `/realtime` al backend.
 
 ### Desarrollo con hot reload
 
@@ -120,7 +127,7 @@ npm run test:unit
 ```
 
 - 23 tests unitarios (10 backend + 13 frontend): reducer versionado, reconnect buffer, countdown, idempotencia —incluido el fallback de UUID fuera de contexto seguro—, guards, UoW y redacción de logs.
-- 42 tests de integración en el perfil `test` de Podman, contra Postgres real (`app_test`).
+- 45 tests de integración en el perfil `test` de Podman, contra Postgres real (`app_test`).
 - 5 tests E2E Playwright con dos contextos, expiración real y axe sin violaciones WCAG 2.1 AA.
 
 - ESLint 9 flat config: `typescript-eslint` type-aware, React Hooks/Refresh y `eslint-plugin-boundaries` (prohíbe que `application` importe `infrastructure`, que `shared`/`frontend` importen backend y que `e2e` importe internals).
@@ -130,7 +137,7 @@ npm run test:unit
 
 ## Variables de entorno
 
-Ver [.env.example](.env.example). Las principales: `DATABASE_URL`, `COOKIE_SECRET`, `COOKIE_SECURE`, `TRUST_PROXY`, `SEAT_HOLD_TTL_SECONDS`, `MAX_HOLDS_PER_FLIGHT`, `THROTTLE_ENABLED`, `PG_POOL_MAX`, `LOCK_TIMEOUT_MS`, `STATEMENT_TIMEOUT_MS`, `TEST_RESET_TOKEN` (solo `test|e2e`).
+Ver [.env.example](.env.example). Las principales: `DATABASE_URL`, `COOKIE_SECRET`, `COOKIE_SECURE`, `TRUST_PROXY`, `SEAT_HOLD_TTL_SECONDS`, `MAX_HOLDS_PER_FLIGHT`, `THROTTLE_ENABLED`, `PG_POOL_MAX`, `LOCK_TIMEOUT_MS`, `STATEMENT_TIMEOUT_MS`, `TEST_RESET_TOKEN` (solo `test|e2e`), `SWAGGER_ENABLED`.
 
 ## Documentación
 

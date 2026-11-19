@@ -38,10 +38,10 @@ flowchart LR
   DB[("PostgreSQL 16")]
   PORTS --> DB
   UI -- "HTTP /api" --> API
-  WS <-- "WebSocket /socket.io" --> GW
+  WS <-- "WebSocket /realtime" --> GW
 ```
 
-nginx sirve el bundle estático y hace proxy de `/api` y `/socket.io` al backend en la misma
+nginx sirve el bundle estático y hace proxy de `/api` y `/realtime` al backend en la misma
 origen. No hay CORS, las cookies de sesión viajan con `SameSite=Lax` y el upgrade de WebSocket se
 resuelve en un único punto.
 
@@ -301,7 +301,7 @@ mapea a rooms y programa `flight.metrics` con deduplicación por vuelo y ventana
 ### 5.1 Protocolo de sincronización
 
 1. `SocketProvider` hace `fetch('/api/health')` para obtener la cookie de sesión firmada y recién
-   después abre `io({ path: '/socket.io' })`.
+   después abre `io({ path: '/realtime' })`.
 2. Al conectar, el cliente emite `flight.join` y **espera el ack** antes de pedir el snapshot.
 3. Los eventos que llegan durante la espera se guardan en un buffer.
 4. Llega el snapshot REST con `version` y `serverTime`; el reducer descarta eventos con versión
@@ -380,7 +380,7 @@ hold intacto y no crea fila en `bookings`.
 - **Unitarios (23):** reducer versionado, reconnect buffer, countdown, idempotencia —incluido el
   fallback de UUID fuera de contexto seguro—, hash, guards, Unit of Work, redacción de logs y
   fronteras de arquitectura.
-- **Integración (42):** Vitest serial contra PostgreSQL real en la base `app_test`, con migraciones,
+- **Integración (45):** Vitest serial contra PostgreSQL real en la base `app_test`, con migraciones,
   seed determinista y reset entre archivos. Cubren concurrencia de 50 sesiones, idempotencia,
   límite de holds, sweeper, carreras de booking/cancelación, rate limit dedicado, cookie/trust
   proxy, sockets reales y el hook de reset de e2e.
@@ -392,16 +392,17 @@ hold intacto y no crea fila en `bookings`.
 
 ## 9. Decisiones técnicas
 
-| Decisión                                         | Por qué                                                                                                                                                  |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Drizzle + SQL explícito                          | Tipado del esquema, pero las sentencias críticas quedan visibles y revisables.                                                                           |
-| `now()` de Postgres como única fuente de TTL     | Sobrevive reinicios, no depende del reloj del proceso ni del navegador. El `Clock` de dominio solo marca timestamps de eventos.                          |
-| Cookie `sid` firmada, `HttpOnly`, `SameSite=Lax` | Sin login en el challenge, pero con identidad no legible por JS; `trust proxy` detrás de nginx.                                                          |
-| Zod + `@flight/shared` con tsup dual ESM/CJS     | Un solo contrato para Nest (CJS) y Vite (ESM), sin DTOs duplicados.                                                                                      |
-| Esquema `public` + ledger de migraciones         | Simplicidad de un día sin perder trazabilidad; los schemas por módulo son la ruta de extracción.                                                         |
-| Admin abierto                                    | La demo no tiene autenticación de back-office; se documenta como límite y se protegería en producción.                                                   |
-| Podman rootless + imágenes fijadas               | El evaluador no instala Node, Postgres ni navegadores; no hay daemon.                                                                                    |
-| Zustand no se usa                                | El seat map necesita una máquina de estados versionada y pura; `useReducer` la expresa mejor que un store global. La dependencia se retiró en la fase 5. |
+| Decisión                                         | Por qué                                                                                                                                                                           |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Drizzle + SQL explícito                          | Tipado del esquema, pero las sentencias críticas quedan visibles y revisables.                                                                                                    |
+| `now()` de Postgres como única fuente de TTL     | Sobrevive reinicios, no depende del reloj del proceso ni del navegador. El `Clock` de dominio solo marca timestamps de eventos.                                                   |
+| Cookie `sid` firmada, `HttpOnly`, `SameSite=Lax` | Sin login en el challenge, pero con identidad no legible por JS; `trust proxy` detrás de nginx.                                                                                   |
+| Zod + `@flight/shared` con tsup dual ESM/CJS     | Un solo contrato para Nest (CJS) y Vite (ESM), sin DTOs duplicados.                                                                                                               |
+| Esquema `public` + ledger de migraciones         | Simplicidad de un día sin perder trazabilidad; los schemas por módulo son la ruta de extracción.                                                                                  |
+| Admin abierto                                    | La demo no tiene autenticación de back-office; se documenta como límite y se protegería en producción.                                                                            |
+| Podman rootless + imágenes fijadas               | El evaluador no instala Node, Postgres ni navegadores; no hay daemon.                                                                                                             |
+| Zustand no se usa                                | El seat map necesita una máquina de estados versionada y pura; `useReducer` la expresa mejor que un store global. La dependencia se retiró en la fase 5.                          |
+| OpenAPI + Swagger UI                             | Generado desde los contratos Zod de `shared/` y servido en `/api/docs`; habilitado fuera de producción por `SWAGGER_ENABLED`. Evita duplicar DTOs y deja el contrato documentado. |
 
 ## 10. Principios y patrones
 
