@@ -1,7 +1,6 @@
 # Arquitectura
 
-Documento de arquitectura del entregable. Explica las decisiones que sostienen la corrección
-del sistema, no solo su estructura. El detalle de producción que queda fuera del alcance está en
+Documento de arquitectura del entregable. Explica las decisiones que sostienen la corrección del sistema, no solo su estructura. El detalle de producción que queda fuera del alcance está en
 [PLAN_APPENDIX.md §16](../PLAN_APPENDIX.md#16-production-path--out-of-scope).
 
 ## 1. Vista general
@@ -77,8 +76,7 @@ Los demás módulos son extraíbles; el orden y los disparadores están en el ap
 El requisito difícil —no vender dos veces el mismo asiento— es un único límite transaccional.
 Mantenerlo en un proceso y una transacción ACID es la solución correcta más simple. La
 modularidad se paga con puertos, fronteras lintadas y tests, no con una red entre servicios.
-La ruta de extracción existe (roles desplegables, módulos con dueños claros), pero no se ejecuta
-en este entregable.
+La ruta de extracción existe (roles desplegables, módulos con dueños claros) en caso de que la organización requiera migrar a otro tipo de architectura.
 
 ### 2.2 PostgreSQL como autoridad
 
