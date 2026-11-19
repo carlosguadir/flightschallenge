@@ -19,6 +19,7 @@ export interface AppConfig {
   logPretty: boolean;
   appVersion: string;
   testResetToken: string;
+  swaggerEnabled: boolean;
 }
 
 export const APP_CONFIG = Symbol('APP_CONFIG');
@@ -75,5 +76,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     logPretty: readBoolean(env.LOG_PRETTY, nodeEnv === 'development'),
     appVersion: env.APP_VERSION ?? 'dev',
     testResetToken: env.TEST_RESET_TOKEN ?? '',
+    swaggerEnabled: readBoolean(env.SWAGGER_ENABLED, nodeEnv !== 'production'),
   };
 }
