@@ -3,11 +3,12 @@ import type { Seat, SeatClass, SeatStatus } from '@flight/shared';
 import type { Pool } from 'pg';
 
 import { PG_POOL } from '../../database/database.tokens';
-import type { DbTransaction } from '../../shared-kernel/application/ports/unit-of-work.port';
+import type { DbTransaction } from '../../shared-kernel';
 import type {
   AcquireHoldInput,
   AcquiredHold,
   ActiveHold,
+  ExpiredSeat,
   HoldLookupInput,
   ReleasedSeat,
   SeatRepository,
@@ -117,6 +118,33 @@ export class PostgresSeatRepository implements SeatRepository {
     if (!row) return null;
 
     return { seatId: row.id, label: row.label };
+  }
+
+  async listFlightsWithExpiredHolds(tx: DbTransaction): Promise<string[]> {
+    const result = await tx.query<{ flight_id: string }>(
+      `SELECT DISTINCT flight_id
+       FROM seats
+       WHERE status = 'HELD' AND hold_expires_at <= now()`,
+    );
+
+    return result.rows.map((row) => row.flight_id);
+  }
+
+  async expireSeats(tx: DbTransaction, flightId: string): Promise<ExpiredSeat[]> {
+    const result = await tx.query<{ id: string; label: string }>(
+      `UPDATE seats
+       SET status = 'AVAILABLE',
+           held_by_session = NULL,
+           hold_expires_at = NULL,
+           version = version + 1
+       WHERE flight_id = $1
+         AND status = 'HELD'
+         AND hold_expires_at <= now()
+       RETURNING id, label`,
+      [flightId],
+    );
+
+    return result.rows.map((row) => ({ seatId: row.id, label: row.label }));
   }
 
   async listByFlight(flightId: string, sessionId: string): Promise<Seat[]> {

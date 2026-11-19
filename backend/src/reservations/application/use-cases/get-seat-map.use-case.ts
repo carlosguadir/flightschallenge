@@ -1,11 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { SeatMap } from '@flight/shared';
 
-import { FLIGHT_QUERY_PORT } from '../../../catalog/application/ports/flight-query.port';
-import type { FlightQueryPort } from '../../../catalog/application/ports/flight-query.port';
+import { FLIGHT_QUERY_PORT, type FlightQueryPort } from '../../../catalog';
 import { APP_CONFIG, type AppConfig } from '../../../config/config';
-import { CLOCK } from '../../../shared-kernel/application/ports/clock.port';
-import type { Clock } from '../../../shared-kernel/application/ports/clock.port';
+import { CLOCK, type Clock } from '../../../shared-kernel';
 import { SEAT_REPOSITORY, type SeatRepository } from '../ports/seat-repository.port';
 
 export interface GetSeatMapQuery {

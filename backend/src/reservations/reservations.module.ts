@@ -5,8 +5,10 @@ import { DatabaseModule } from '../database/database.module';
 import { SharedKernelModule } from '../shared-kernel/shared-kernel.module';
 import { SEAT_REPOSITORY } from './application/ports/seat-repository.port';
 import { AcquireHold } from './application/use-cases/acquire-hold.use-case';
+import { ExpireHolds } from './application/use-cases/expire-holds.use-case';
 import { GetSeatMap } from './application/use-cases/get-seat-map.use-case';
 import { ReleaseHold } from './application/use-cases/release-hold.use-case';
+import { HoldExpirySweeper } from './infrastructure/hold-expiry.sweeper';
 import { PostgresSeatRepository } from './infrastructure/postgres-seat.repository';
 import { SeatsController } from './infrastructure/seats.controller';
 
@@ -19,6 +21,8 @@ import { SeatsController } from './infrastructure/seats.controller';
     AcquireHold,
     ReleaseHold,
     GetSeatMap,
+    ExpireHolds,
+    HoldExpirySweeper,
   ],
 })
 export class ReservationsModule {}

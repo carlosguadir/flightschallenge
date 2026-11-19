@@ -4,13 +4,17 @@ import type { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 
 import { APP_CONFIG, type AppConfig } from '../../config/config';
 import { PG_POOL } from '../../database/database.tokens';
-import type { DbTransaction, UnitOfWork } from '../application/ports/unit-of-work.port';
+import type {
+  DbTransaction,
+  SweeperTransaction,
+  UnitOfWork,
+} from '../application/ports/unit-of-work.port';
 import { PostCommitEventPublisher } from './post-commit-event-publisher';
 
 const MAX_ATTEMPTS = 3;
 const TRANSIENT_CODES = new Set(['40001', '40P01', '55P03']);
 
-class PgTransaction implements DbTransaction {
+class PgTransaction implements SweeperTransaction {
   constructor(private readonly client: PoolClient) {}
 
   query<T extends QueryResultRow = QueryResultRow>(
@@ -18,6 +22,10 @@ class PgTransaction implements DbTransaction {
     params?: readonly unknown[],
   ): Promise<QueryResult<T>> {
     return this.client.query<T>(text, params as unknown[] | undefined);
+  }
+
+  async lockFlight(flightId: string): Promise<void> {
+    await this.client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`flight:${flightId}`]);
   }
 }
 
@@ -52,12 +60,54 @@ export class PostgresUnitOfWork implements UnitOfWork {
       try {
         await client.query('BEGIN');
         began = true;
-        await client.query(
-          `SELECT set_config('lock_timeout', $1, true),
-                  set_config('statement_timeout', $2, true)`,
-          [String(this.config.lockTimeoutMs), String(this.config.statementTimeoutMs)],
+        await this.configureTransaction(client);
+
+        const tx = new PgTransaction(client);
+        await tx.lockFlight(flightId);
+
+        const result = await this.publisher.collect(pending, () => work(tx));
+        await client.query('COMMIT');
+        this.publisher.flush(pending);
+        return result;
+      } catch (error) {
+        lastError = error;
+        if (began) {
+          await client.query('ROLLBACK').catch(() => undefined);
+        }
+        if (isTransient(error) && attempt < MAX_ATTEMPTS - 1) {
+          await sleep(50 * 2 ** attempt);
+          continue;
+        }
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Transaction failed');
+  }
+
+  async runSweeperTransaction<T>(work: (tx: SweeperTransaction) => Promise<T>): Promise<T | null> {
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+      const pending: ServerEvent[] = [];
+      const client = await this.pool.connect();
+      let began = false;
+
+      try {
+        await client.query('BEGIN');
+        began = true;
+        await this.configureTransaction(client);
+
+        const lock = await client.query<{ locked: boolean }>(
+          'SELECT pg_try_advisory_xact_lock(hashtext($1)) AS locked',
+          ['sweeper'],
         );
-        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`flight:${flightId}`]);
+        if (!lock.rows[0]?.locked) {
+          await client.query('ROLLBACK');
+          return null;
+        }
 
         const result = await this.publisher.collect(pending, () => work(new PgTransaction(client)));
         await client.query('COMMIT');
@@ -78,6 +128,14 @@ export class PostgresUnitOfWork implements UnitOfWork {
       }
     }
 
-    throw lastError instanceof Error ? lastError : new Error('Transaction failed');
+    throw lastError instanceof Error ? lastError : new Error('Sweeper transaction failed');
+  }
+
+  private async configureTransaction(client: PoolClient): Promise<void> {
+    await client.query(
+      `SELECT set_config('lock_timeout', $1, true),
+              set_config('statement_timeout', $2, true)`,
+      [String(this.config.lockTimeoutMs), String(this.config.statementTimeoutMs)],
+    );
   }
 }

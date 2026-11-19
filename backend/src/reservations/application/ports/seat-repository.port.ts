@@ -1,6 +1,6 @@
 import type { Seat } from '@flight/shared';
 
-import type { DbTransaction } from '../../../shared-kernel/application/ports/unit-of-work.port';
+import type { DbTransaction } from '../../../shared-kernel';
 
 export interface ActiveHold {
   seatId: string;
@@ -16,6 +16,11 @@ export interface AcquiredHold {
 }
 
 export interface ReleasedSeat {
+  seatId: string;
+  label: string;
+}
+
+export interface ExpiredSeat {
   seatId: string;
   label: string;
 }
@@ -39,6 +44,8 @@ export interface SeatRepository {
   acquireHold(tx: DbTransaction, input: AcquireHoldInput): Promise<AcquiredHold | null>;
   releaseHold(tx: DbTransaction, input: HoldLookupInput): Promise<ReleasedSeat | null>;
   listByFlight(flightId: string, sessionId: string): Promise<Seat[]>;
+  listFlightsWithExpiredHolds(tx: DbTransaction): Promise<string[]>;
+  expireSeats(tx: DbTransaction, flightId: string): Promise<ExpiredSeat[]>;
 }
 
 export const SEAT_REPOSITORY = Symbol('SEAT_REPOSITORY');

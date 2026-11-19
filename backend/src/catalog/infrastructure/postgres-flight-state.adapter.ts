@@ -67,7 +67,10 @@ export class PostgresFlightStateAdapter implements FlightStatePort {
     ]);
 
     return {
-      seatEventVersion: previousVersion + 1,
+      seatEventVersions: Array.from(
+        { length: seatEvents },
+        (_, index) => previousVersion + index + 1,
+      ),
       flightVersion,
       status: flight.status,
       delayMinutes: flight.delay_minutes,

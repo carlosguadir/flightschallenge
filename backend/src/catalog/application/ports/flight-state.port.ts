@@ -1,9 +1,9 @@
 import type { FlightStatus } from '@flight/shared';
 
-import type { DbTransaction } from '../../../shared-kernel/application/ports/unit-of-work.port';
+import type { DbTransaction } from '../../../shared-kernel';
 
 export interface SeatChangeResult {
-  seatEventVersion: number;
+  seatEventVersions: number[];
   flightVersion: number;
   status: FlightStatus;
   delayMinutes: number;

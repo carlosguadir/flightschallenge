@@ -29,3 +29,20 @@ Documento obligatorio del KATA (§6.1). Se actualiza al final de cada fase, no d
 ### Impacto estimado
 
 Pendiente de consolidar al final del challenge. Estimación inicial: ~1.5 h ahorradas en scaffolding (workspaces, tsconfig, contratos Zod, Vitest, Containerfiles) y ~2 h invertidas en corregir los problemas de concurrencia/idempotencia anteriores y en ajustar la configuración de Podman/ESLint.
+
+## Fase 1 — Núcleo de reservas y búsqueda
+
+### Prompts y casos de uso
+
+- **Prompt:** «procede a implementar la phase 1».
+- **Resultado:** búsqueda y detalle de vuelos, guard de estado de vuelo, holds con máximo de 4 por sesión/vuelo, release, expiración lazy + sweeper cada segundo, versión por evento y por lote, guards de transición de asiento/estado y la suite §10.1–§10.4, §10.10, §10.20–§10.22.
+
+### Casos en los que la IA se equivocó y cómo se corrigió
+
+- **Versionado pensado solo para un asiento.** `SeatChangeResult` devolvía una única `seatEventVersion`; el sweeper puede liberar N asientos en un vuelo y necesita una versión consecutiva por evento. Se cambió a `seatEventVersions: number[]` y el sweeper asigna una por fila, dejando `flight.updated` con la última.
+- **Imports internos entre módulos.** Los use cases importaban puertos de `catalog` por ruta profunda. El test de arquitectura §10.21 lo detectó; se movieron a los `index.ts` públicos y se añadió la comprobación automática de imports.
+- **Sweeper fuera del Unit of Work.** Publicar eventos al liberar asientos antes del commit rompía la garantía after-commit. Se añadió `runSweeperTransaction` con lock transaccional `sweeper` y lock por vuelo, reutilizando la cola de eventos post-commit.
+
+### Impacto estimado
+
+Pendiente de consolidar. La implementación de la fase 1 fue directa gracias a que el esquema, el lock por vuelo y los contratos ya existían; el mayor tiempo se fue en los tests de concurrencia/paridad y en ajustar el versionado por lote.

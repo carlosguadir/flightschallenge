@@ -1,12 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { FLIGHT_STATE_PORT } from '../../../catalog/application/ports/flight-state.port';
-import type { FlightStatePort } from '../../../catalog/application/ports/flight-state.port';
-import { EVENT_PUBLISHER } from '../../../shared-kernel/application/ports/event-publisher.port';
-import type { EventPublisher } from '../../../shared-kernel/application/ports/event-publisher.port';
-import { UNIT_OF_WORK } from '../../../shared-kernel/application/ports/unit-of-work.port';
-import type { UnitOfWork } from '../../../shared-kernel/application/ports/unit-of-work.port';
-import { AppError } from '../../../shared-kernel/domain/app-error';
+import { FLIGHT_STATE_PORT, type FlightStatePort } from '../../../catalog';
+import {
+  AppError,
+  EVENT_PUBLISHER,
+  UNIT_OF_WORK,
+  type EventPublisher,
+  type UnitOfWork,
+} from '../../../shared-kernel';
 import { SEAT_REPOSITORY, type SeatRepository } from '../ports/seat-repository.port';
 
 export interface ReleaseHoldCommand {
@@ -40,7 +41,7 @@ export class ReleaseHold {
           seatId: released.seatId,
           label: released.label,
           reason: 'USER',
-          version: state.seatEventVersion,
+          version: state.seatEventVersions[0] ?? state.flightVersion,
         },
       });
 

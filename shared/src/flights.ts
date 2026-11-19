@@ -24,9 +24,22 @@ export const FlightSummarySchema = z.object({
 export type FlightSummary = z.infer<typeof FlightSummarySchema>;
 
 export const FlightSearchQuerySchema = z.object({
-  origin: z.string().length(3).optional(),
-  destination: z.string().length(3).optional(),
-  date: z.string().optional(),
+  origin: z
+    .string()
+    .trim()
+    .length(3)
+    .transform((value) => value.toUpperCase())
+    .optional(),
+  destination: z
+    .string()
+    .trim()
+    .length(3)
+    .transform((value) => value.toUpperCase())
+    .optional(),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'date must use YYYY-MM-DD')
+    .optional(),
 });
 
 export type FlightSearchQuery = z.infer<typeof FlightSearchQuerySchema>;
