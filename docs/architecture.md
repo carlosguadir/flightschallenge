@@ -1,7 +1,6 @@
 # Arquitectura
 
-Documento de arquitectura del entregable. Explica las decisiones que sostienen la corrección del sistema, no solo su estructura. El detalle de producción que queda fuera del alcance está en
-[PLAN_APPENDIX.md §16](../PLAN_APPENDIX.md#16-production-path--out-of-scope).
+Documento de arquitectura del entregable. Explica las decisiones que sostienen la corrección del sistema, no solo su estructura. El detalle de producción que queda fuera del alcance se resume en la sección 11.
 
 ## 1. Vista general
 
@@ -430,8 +429,7 @@ esas piezas agregarían complejidad sin resolver el requisito.
 ## 11. Límites y camino a producción
 
 El entregable no incluye AWS, Terraform, Helm, CD, tracing, outbox, máquina de estados de pagos
-reales ni jobs asíncronos. Están identificados y justificados en
-[PLAN_APPENDIX.md §16](../PLAN_APPENDIX.md#16-production-path--out-of-scope).
+reales ni jobs asíncronos. Están identificados y justificados en la tabla de modos de fallo.
 
 ### Tabla de modos de fallo
 

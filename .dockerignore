@@ -4,8 +4,6 @@
 .git
 .github
 docs
-PLAN.md
-PLAN_APPENDIX.md
 playwright-report
 test-results
 *.log

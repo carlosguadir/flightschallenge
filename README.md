@@ -141,8 +141,6 @@ Ver [.env.example](.env.example). Las principales: `DATABASE_URL`, `COOKIE_SECRE
 
 ## Documentación
 
-- [PLAN.md](PLAN.md) — plan y arquitectura.
-- [PLAN_APPENDIX.md](PLAN_APPENDIX.md) — defensa, producción y guías de docs.
 - [docs/architecture.md](docs/architecture.md) — decisiones, SQL de concurrencia, realtime, testing y modos de fallo.
 - [docs/operations.md](docs/operations.md) — arranque, reset, perfiles, variables y troubleshooting.
 - [docs/ia.md](docs/ia.md) — bitácora de uso de IA y consolidado de impacto por fase.
