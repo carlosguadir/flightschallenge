@@ -1,4 +1,4 @@
-import type { Seat } from '@flight/shared';
+import type { FlightStatus, Seat, SeatStatus } from '@flight/shared';
 
 import type { DbTransaction } from '../../../shared-kernel';
 
@@ -25,6 +25,17 @@ export interface ExpiredSeat {
   label: string;
 }
 
+export interface BookingSeat {
+  seatId: string;
+  label: string;
+  status: SeatStatus;
+  heldBySession: string | null;
+  holdActive: boolean;
+  priceCents: number;
+  currency: string;
+  flightStatus: FlightStatus;
+}
+
 export interface AcquireHoldInput {
   flightId: string;
   seatId: string;
@@ -46,6 +57,7 @@ export interface SeatRepository {
   listByFlight(flightId: string, sessionId: string): Promise<Seat[]>;
   listFlightsWithExpiredHolds(tx: DbTransaction): Promise<string[]>;
   expireSeats(tx: DbTransaction, flightId: string): Promise<ExpiredSeat[]>;
+  lockForBooking(tx: DbTransaction, flightId: string, seatId: string): Promise<BookingSeat | null>;
 }
 
 export const SEAT_REPOSITORY = Symbol('SEAT_REPOSITORY');

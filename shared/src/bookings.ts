@@ -37,7 +37,11 @@ export const BookingResponseSchema = z.object({
 export type BookingResponse = z.infer<typeof BookingResponseSchema>;
 
 export const BookingLookupRequestSchema = z.object({
-  code: z.string().trim().length(6),
+  code: z
+    .string()
+    .trim()
+    .length(6)
+    .transform((value) => value.toUpperCase()),
   email: z
     .string()
     .trim()

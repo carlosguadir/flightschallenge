@@ -46,3 +46,20 @@ Pendiente de consolidar al final del challenge. Estimación inicial: ~1.5 h ahor
 ### Impacto estimado
 
 Pendiente de consolidar. La implementación de la fase 1 fue directa gracias a que el esquema, el lock por vuelo y los contratos ya existían; el mayor tiempo se fue en los tests de concurrencia/paridad y en ajustar el versionado por lote.
+
+## Fase 2 — Booking, pago fake e idempotencia
+
+### Prompts y casos de uso
+
+- **Prompt:** «procede con la fase 2».
+- **Resultado:** `ConfirmBooking` con lock por vuelo, `PaymentPort` + adapter fake (`TEST_OK`/`TEST_DECLINE`, sin PAN), hash canónico SHA-256 de la request, código base32 de 6 caracteres con reintento ante colisión, replay idempotente 200, lookup por código + email y la suite §10.5–§10.7, §10.11, §10.13–§10.15.
+
+### Casos en los que la IA se equivocó y cómo se corrigió
+
+- **Replay antes de validar el asiento.** El primer borrador comprobaba la idempotencia después de validar el estado del asiento, así que un replay después de `BOOKED` podía fallar. Se añadió el fast path por `idempotency_key` antes de abrir la transacción y un segundo chequeo dentro de la transacción, después del lock.
+- **Colisión de código dentro de una transacción.** Un `UNIQUE` en `bookings.code` aborta la transacción completa, así que no basta con reintentar el `INSERT`. Se usó un `SAVEPOINT` por intento: `ROLLBACK TO SAVEPOINT` y regeneración del código, con un máximo de 3 intentos.
+- **Test de `seatId` ajeno mal planteado.** La primera versión enviaba el `flightId` del otro vuelo, por lo que el test comprobaba un hold inexistente (410) y no el mismatch de contrato. Se corrigió para enviar el `flightId` solicitado con el `seatId` de otro vuelo y exigir 409 `SEAT_UNAVAILABLE`.
+
+### Impacto estimado
+
+Pendiente de consolidar. La fase 2 se apoyó en el esquema y el Unit of Work existentes; el tiempo se concentró en la semántica de idempotencia (fast path + chequeo intra-transacción), el manejo de colisiones de código y los tests concurrentes.

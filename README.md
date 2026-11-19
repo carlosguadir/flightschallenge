@@ -2,18 +2,22 @@
 
 Sistema de reserva de vuelos con holds temporales, booking y actualizaciones en tiempo real. Monolito modular NestJS + React, PostgreSQL 16 y Podman Compose.
 
-**Estado actual: fase 1 (núcleo de reservas).** Ya funcionan búsqueda/detalle de vuelos, snapshot del seat map, holds idempotentes con máximo 4 por sesión y vuelo, release, expiración por sweeper + lazy expiry, guards de estado y la base transaccional por vuelo. Booking, realtime completo, dashboard y UI llegan en las fases 2–5.
+**Estado actual: fase 2 (booking y pago fake).** Ya funcionan búsqueda/detalle de vuelos, snapshot del seat map, holds idempotentes con máximo 4 por sesión y vuelo, release, expiración por sweeper + lazy expiry, guards de estado y el flujo completo de booking con pago simulado, idempotencia y lookup. Realtime completo, dashboard y UI llegan en las fases 3–5.
 
 ### Endpoints disponibles
 
-| Método | Ruta                                      | Descripción                                    |
-| ------ | ----------------------------------------- | ---------------------------------------------- |
-| GET    | `/api/health`                             | Healthcheck con ping a la base                 |
-| GET    | `/api/flights?origin=&destination=&date=` | Búsqueda (fecha UTC `YYYY-MM-DD`)              |
-| GET    | `/api/flights/:id`                        | Detalle del vuelo                              |
-| GET    | `/api/flights/:id/seats`                  | Snapshot del seat map + `serverTime` + versión |
-| POST   | `/api/flights/:id/seats/:seatId/hold`     | Hold idempotente (máx. 4 por sesión/vuelo)     |
-| DELETE | `/api/flights/:id/seats/:seatId/hold`     | Release del hold propio                        |
+| Método | Ruta                                      | Descripción                                                |
+| ------ | ----------------------------------------- | ---------------------------------------------------------- |
+| GET    | `/api/health`                             | Healthcheck con ping a la base                             |
+| GET    | `/api/flights?origin=&destination=&date=` | Búsqueda (fecha UTC `YYYY-MM-DD`)                          |
+| GET    | `/api/flights/:id`                        | Detalle del vuelo                                          |
+| GET    | `/api/flights/:id/seats`                  | Snapshot del seat map + `serverTime` + versión             |
+| POST   | `/api/flights/:id/seats/:seatId/hold`     | Hold idempotente (máx. 4 por sesión/vuelo)                 |
+| DELETE | `/api/flights/:id/seats/:seatId/hold`     | Release del hold propio                                    |
+| POST   | `/api/bookings`                           | Booking con `Idempotency-Key` y pago fake                  |
+| POST   | `/api/bookings/lookup`                    | Ticket por `{code, email}` (rate limited, sin enumeración) |
+
+`POST /api/bookings` acepta `payment.method` como `TEST_OK` o `TEST_DECLINE`; no recibe datos de tarjeta. La primera confirmación devuelve `201` y los replays idempotentes `200`.
 
 ## Stack
 

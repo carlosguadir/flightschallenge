@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { Seat, SeatClass, SeatStatus } from '@flight/shared';
+import type { FlightStatus, Seat, SeatClass, SeatStatus } from '@flight/shared';
 import type { Pool } from 'pg';
 
 import { PG_POOL } from '../../database/database.tokens';
@@ -8,6 +8,7 @@ import type {
   AcquireHoldInput,
   AcquiredHold,
   ActiveHold,
+  BookingSeat,
   ExpiredSeat,
   HoldLookupInput,
   ReleasedSeat,
@@ -145,6 +146,51 @@ export class PostgresSeatRepository implements SeatRepository {
     );
 
     return result.rows.map((row) => ({ seatId: row.id, label: row.label }));
+  }
+
+  async lockForBooking(
+    tx: DbTransaction,
+    flightId: string,
+    seatId: string,
+  ): Promise<BookingSeat | null> {
+    const result = await tx.query<{
+      id: string;
+      label: string;
+      status: SeatStatus;
+      held_by_session: string | null;
+      hold_active: boolean;
+      price_cents: number;
+      currency: string;
+      flight_status: FlightStatus;
+    }>(
+      `SELECT s.id,
+              s.label,
+              s.status,
+              s.held_by_session,
+              (s.hold_expires_at IS NOT NULL AND s.hold_expires_at > now()) AS hold_active,
+              s.price_cents,
+              f.currency,
+              f.status AS flight_status
+       FROM seats s
+       JOIN flights f ON f.id = s.flight_id
+       WHERE s.id = $1 AND s.flight_id = $2
+       FOR UPDATE OF s`,
+      [seatId, flightId],
+    );
+
+    const row = result.rows[0];
+    if (!row) return null;
+
+    return {
+      seatId: row.id,
+      label: row.label,
+      status: row.status,
+      heldBySession: row.held_by_session,
+      holdActive: row.hold_active,
+      priceCents: row.price_cents,
+      currency: row.currency.trim(),
+      flightStatus: row.flight_status,
+    };
   }
 
   async listByFlight(flightId: string, sessionId: string): Promise<Seat[]> {

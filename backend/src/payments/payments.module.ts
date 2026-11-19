@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 
-/**
- * Phase 2: PaymentPort + fake payment adapter (TEST_OK / TEST_DECLINE).
- * Kept as an explicit module boundary from phase 0.
- */
-@Module({})
+import { PAYMENT_PORT } from './application/ports/payment.port';
+import { FakePaymentAdapter } from './infrastructure/fake-payment.adapter';
+
+@Module({
+  providers: [FakePaymentAdapter, { provide: PAYMENT_PORT, useExisting: FakePaymentAdapter }],
+  exports: [PAYMENT_PORT],
+})
 export class PaymentsModule {}
