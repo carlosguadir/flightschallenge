@@ -1,0 +1,38 @@
+{
+  "name": "flight-booking",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Flight booking challenge — modular monolith with real-time seat inventory",
+  "workspaces": [
+    "shared",
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "npm run build --workspace @flight/shared && npm run build --workspace @flight/backend && npm run build --workspace @flight/frontend",
+    "dev:backend": "npm run start:dev --workspace @flight/backend",
+    "dev:frontend": "npm run dev --workspace @flight/frontend",
+    "lint": "eslint .",
+    "typecheck": "npm run build --workspace @flight/shared && npm run typecheck --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:unit": "npm run build --workspace @flight/shared && npm run test:unit --workspace @flight/backend",
+    "test:integration": "npm run build --workspace @flight/shared && npm run test:integration --workspace @flight/backend",
+    "quality": "npm run lint && npm run typecheck && npm run format:check && npm run test:unit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-boundaries": "^5.0.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0"
+  }
+}

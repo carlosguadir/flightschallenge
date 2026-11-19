@@ -1,0 +1,37 @@
+FROM docker.io/library/node:22-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY shared/package.json shared/
+COPY backend/package.json backend/
+COPY frontend/package.json frontend/
+RUN npm ci --workspace @flight/shared --workspace @flight/backend --include-workspace-root
+
+FROM deps AS build
+COPY tsconfig.base.json ./
+COPY shared shared
+COPY backend backend
+RUN npm run build --workspace @flight/shared \
+    && npm run build --workspace @flight/backend
+
+FROM build AS development
+ENV NODE_ENV=development
+CMD ["npm", "run", "start:dev", "--workspace", "@flight/backend"]
+
+FROM build AS test
+ENV NODE_ENV=test
+CMD ["npm", "run", "test:integration"]
+
+FROM build AS production-deps
+RUN npm prune --omit=dev
+
+FROM docker.io/library/node:22-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=production-deps /app/node_modules ./node_modules
+COPY --from=production-deps /app/shared/package.json ./shared/package.json
+COPY --from=production-deps /app/shared/dist ./shared/dist
+COPY --from=production-deps /app/backend/package.json ./backend/package.json
+COPY --from=production-deps /app/backend/dist ./backend/dist
+WORKDIR /app/backend
+EXPOSE 3000
+CMD ["node", "dist/main.js"]

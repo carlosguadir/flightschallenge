@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/coverage
+.git
+.github
+docs
+e2e
+PLAN.md
+PLAN_APPENDIX.md
+playwright-report
+test-results
+*.log
